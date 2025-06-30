@@ -1,0 +1,9 @@
+{
+  "num_bay_x": 2,
+  "num_bay_y": 4,
+  "num_floor": 5,
+  "bay_widths_x": [4.0, 5.0],
+  "bay_widths_y": [4.0, 4.0, 5,2],
+  "story_heights": [3.0, 3.0],
+  "mesh_density": 1
+}
