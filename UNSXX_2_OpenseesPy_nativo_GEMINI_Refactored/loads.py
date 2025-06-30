@@ -37,76 +37,95 @@ class LoadCase:
         self.distributed_loads = []  # Lista de cargas distribuidas
         self.element_loads = []  # Lista de cargas en elementos
 
-def get_load_intensities(interactive=True):
+def get_load_intensities(interactive=True, slab_config=None):
     """
     Solicita al usuario las intensidades de carga o usa valores por defecto.
     
     Args:
         interactive (bool): Si True, solicita entrada del usuario
+        slab_config (dict): Configuración del tipo de losa
     
     Returns:
         dict: Diccionario con intensidades de carga
     """
+    # Obtener peso propio de losa según configuración
+    slab_self_weight = 5.0  # kN/m² por defecto
+    if slab_config:
+        slab_self_weight = slab_config.get('self_weight', 5.0)
+    
     if not interactive:
-        # Valores por defecto típicos para edificios (sistema internacional: N, m, s)
+        # Valores por defecto típicos para edificios (en kN)
         return {
-            "dead_load_slab": 4000.0,     # N/m² (carga muerta en losas)
-            "live_load_slab": 2000.0,     # N/m² (carga viva en losas)
-            "dead_load_beam": 1000.0,     # N/m (carga muerta lineal en vigas)
-            "live_load_beam": 500.0,      # N/m (carga viva lineal en vigas)
-            "point_load_test": 10000.0,   # N (carga puntual de prueba)
-            "wind_pressure": 1000.0,      # N/m² (presión de viento)
-            "seismic_coeff": 0.2          # Coeficiente sísmico
+            "dead_load_slab": 4.0 + slab_self_weight,  # kN/m² (carga muerta + peso propio)
+            "live_load_slab": 2.0,                     # kN/m² (carga viva en losas)
+            "dead_load_beam": 1.0,                     # kN/m (carga muerta lineal en vigas)
+            "live_load_beam": 0.5,                     # kN/m (carga viva lineal en vigas)
+            "point_load_test": 10.0,                   # kN (carga puntual de prueba)
+            "wind_pressure": 1.0,                      # kN/m² (presión de viento)
+            "seismic_coeff": 0.2,                      # Coeficiente sísmico
+            "slab_self_weight": slab_self_weight       # kN/m² (peso propio de losa)
         }
     
     print("\n=== CONFIGURACIÓN DE INTENSIDADES DE CARGA ===")
-    print("SISTEMA INTERNACIONAL: Las cargas se ingresan en N/m² y N/m")
-    print("Conversión: 1 kN/m² = 1000 N/m², 1 kN/m = 1000 N/m")
-    print("Valores típicos: losas 2000-6000 N/m², vigas 1000-3000 N/m")
+    print("SISTEMA DE UNIDADES: Las cargas se ingresan en kN/m² y kN/m")
+    print("Valores típicos para edificios:")
+    print("  • Losas: 2-8 kN/m² (cargas variables)")
+    print("  • Vigas: 1-3 kN/m (cargas adicionales)")
+    
+    if slab_config:
+        print(f"\n📋 INFORMACIÓN DE LOSA CONFIGURADA:")
+        print(f"  • Tipo: {slab_config.get('description', 'No especificado')}")
+        print(f"  • Peso propio: {slab_self_weight:.1f} kN/m²")
     
     intensities = {}
     
-    # Cargas en losas
+    # Cargas muertas en losas (excluyendo peso propio)
+    print(f"\n🏗️  CARGAS MUERTAS EN LOSAS:")
+    print(f"El peso propio de {slab_self_weight:.1f} kN/m² se añade automáticamente.")
     while True:
         try:
-            dead_slab = float(input("Carga muerta en losas (N/m²) [2000-8000]: "))
-            if 2000.0 <= dead_slab <= 8000.0:
-                intensities["dead_load_slab"] = dead_slab
+            dead_slab_additional = float(input("Carga muerta adicional en losas (kN/m²) [2.0-8.0]: "))
+            if 2.0 <= dead_slab_additional <= 8.0:
+                intensities["dead_load_slab"] = dead_slab_additional + slab_self_weight
                 break
             else:
-                print("La carga debe estar entre 2000 y 8000 N/m²")
+                print("La carga debe estar entre 2.0 y 8.0 kN/m²")
         except ValueError:
             print("Por favor ingrese un número válido")
     
+    # Cargas vivas en losas
+    print(f"\n🏠 CARGAS VIVAS EN LOSAS:")
     while True:
         try:
-            live_slab = float(input("Carga viva en losas (N/m²) [1000-5000]: "))
-            if 1000.0 <= live_slab <= 5000.0:
+            live_slab = float(input("Carga viva en losas (kN/m²) [1.0-5.0]: "))
+            if 1.0 <= live_slab <= 5.0:
                 intensities["live_load_slab"] = live_slab
                 break
             else:
-                print("La carga debe estar entre 1000 y 5000 N/m²")
+                print("La carga debe estar entre 1.0 y 5.0 kN/m²")
         except ValueError:
             print("Por favor ingrese un número válido")
     
     # Cargas en vigas
+    print(f"\n🌉 CARGAS ADICIONALES EN VIGAS:")
     while True:
         try:
-            dead_beam = float(input("Carga muerta adicional en vigas (N/m) [500-3000]: "))
-            if 500.0 <= dead_beam <= 3000.0:
+            dead_beam = float(input("Carga muerta adicional en vigas (kN/m) [0.5-3.0]: "))
+            if 0.5 <= dead_beam <= 3.0:
                 intensities["dead_load_beam"] = dead_beam
                 break
             else:
-                print("La carga debe estar entre 500 y 3000 N/m")
+                print("La carga debe estar entre 0.5 y 3.0 kN/m")
         except ValueError:
             print("Por favor ingrese un número válido")
     
     # Valores automáticos para otras cargas
     intensities.update({
         "live_load_beam": intensities["dead_load_beam"] * 0.5,
-        "point_load_test": 10000.0,  # N
-        "wind_pressure": 1000.0,     # N/m²
-        "seismic_coeff": 0.2
+        "point_load_test": 10.0,                # kN
+        "wind_pressure": 1.0,                   # kN/m²
+        "seismic_coeff": 0.2,                   # Coeficiente sísmico
+        "slab_self_weight": slab_self_weight    # kN/m²
     })
     
     return intensities

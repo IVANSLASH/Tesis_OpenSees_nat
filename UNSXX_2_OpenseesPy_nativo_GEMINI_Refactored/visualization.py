@@ -25,6 +25,102 @@ from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.patches import ConnectionPatch
 import matplotlib.colors as mcolors
 
+def plot_model_native(num_floor, total_nodes, total_elements):
+    """
+    Visualización nativa del modelo sin dependencia de opsvis,
+    especialmente útil para mostrar volados correctamente.
+    """
+    print("\n=== VISUALIZACIÓN NATIVA DEL MODELO (CON VOLADOS) ===\n")
+    
+    try:
+        # Obtener todos los nodos y elementos
+        node_tags = ops.getNodeTags()
+        ele_tags = ops.getEleTags()
+        
+        if not node_tags or not ele_tags:
+            print("⚠️ No hay nodos o elementos para visualizar")
+            return None
+        
+        # Crear figura 3D
+        fig = plt.figure(figsize=(16, 12))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # Obtener coordenadas de todos los nodos
+        node_coords = {}
+        for tag in node_tags:
+            coord = ops.nodeCoord(tag)
+            node_coords[tag] = coord
+            # Plotear nodos
+            ax.scatter(coord[0], coord[1], coord[2], c='red', s=30, alpha=0.8)
+            ax.text(coord[0], coord[1], coord[2], f'  {tag}', fontsize=8)
+        
+        # Plotear elementos
+        for ele_tag in ele_tags:
+            try:
+                nodes = ops.eleNodes(ele_tag)
+                if len(nodes) >= 2:
+                    coord1 = node_coords[nodes[0]]
+                    coord2 = node_coords[nodes[1]]
+                    
+                    # Línea del elemento
+                    ax.plot([coord1[0], coord2[0]], 
+                           [coord1[1], coord2[1]], 
+                           [coord1[2], coord2[2]], 
+                           'b-', linewidth=2, alpha=0.7)
+                    
+                    # Etiqueta del elemento
+                    mid_x = (coord1[0] + coord2[0]) / 2
+                    mid_y = (coord1[1] + coord2[1]) / 2
+                    mid_z = (coord1[2] + coord2[2]) / 2
+                    ax.text(mid_x, mid_y, mid_z, f'{ele_tag}', fontsize=7, color='blue')
+            except Exception as e:
+                print(f"    ⚠️ Error graficando elemento {ele_tag}: {e}")
+        
+        # Configurar ejes y límites
+        coords_array = np.array(list(node_coords.values()))
+        x_min, x_max = coords_array[:, 0].min(), coords_array[:, 0].max()
+        y_min, y_max = coords_array[:, 1].min(), coords_array[:, 1].max()
+        z_min, z_max = coords_array[:, 2].min(), coords_array[:, 2].max()
+        
+        # Añadir margen
+        x_margin = max((x_max - x_min) * 0.1, 0.5)
+        y_margin = max((y_max - y_min) * 0.1, 0.5)
+        z_margin = max((z_max - z_min) * 0.1, 0.5)
+        
+        ax.set_xlim(x_min - x_margin, x_max + x_margin)
+        ax.set_ylim(y_min - y_margin, y_max + y_margin)
+        ax.set_zlim(z_min - z_margin, z_max + z_margin)
+        
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+        ax.set_zlabel('Z (m)')
+        ax.set_title(f'MODELO NATIVO CON VOLADOS - Edificio de {num_floor} plantas\n{total_nodes} nodos, {total_elements} elementos\nSistema Métrico (m, kN, s)', 
+                    fontsize=14, fontweight='bold', color='darkred')
+        
+        # Añadir información de coordenadas
+        ax.text2D(0.02, 0.98, f"Rango X: [{x_min:.1f}, {x_max:.1f}] m\nRango Y: [{y_min:.1f}, {y_max:.1f}] m\nRango Z: [{z_min:.1f}, {z_max:.1f}] m", 
+                 transform=ax.transAxes, fontsize=10, verticalalignment='top',
+                 bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow"))
+        
+        # Maximizar ventana
+        try:
+            mng = plt.get_current_fig_manager()
+            if hasattr(mng, 'window'):
+                if hasattr(mng.window, 'state'):
+                    mng.window.state('zoomed')
+                elif hasattr(mng.window, 'showMaximized'):
+                    mng.window.showMaximized()
+        except:
+            pass
+        
+        plt.show()
+        print("✓ Visualización nativa completada - volados incluidos")
+        return fig
+        
+    except Exception as e:
+        print(f"✗ Error en visualización nativa: {e}")
+        return None
+
 def plot_model_and_defo(num_floor, total_nodes, total_elements):
     """
     Visualiza el modelo estructural y su forma deformada.
@@ -40,6 +136,9 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
     az_el = (-60.0, 30.0)
     fig_wi_he = (20, 15)
 
+    # Primero intentar visualización nativa (especial para volados)
+    native_fig = plot_model_native(num_floor, total_nodes, total_elements)
+    
     try:
         # Crear figura de referencia con etiquetas que se mantendrá abierta
         reference_figure = plt.figure(figsize=(16, 12))
@@ -62,14 +161,15 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
             truss_node_offset=0.96,
             ax=False
         )
-        plt.title(f"MODELO DE REFERENCIA - Edificio de {num_floor} plantas\n{total_nodes} nodos, {total_elements} elementos\nUSE ESTA FIGURA PARA IDENTIFICAR ELEMENTOS EN EL CSV\nSistema Métrico (m, kN, s)", 
+        plt.title(f"MODELO DE REFERENCIA (OPSVIS) - Edificio de {num_floor} plantas\n{total_nodes} nodos, {total_elements} elementos\nUSE ESTA FIGURA PARA IDENTIFICAR ELEMENTOS EN EL CSV\nSistema Métrico (m, kN, s)", 
                  fontsize=14, fontweight='bold', color='darkred')
         
         # Añadir texto explicativo
         plt.figtext(0.02, 0.02, 
                    "IMPORTANTE: Esta figura permanece abierta para consulta.\n" +
                    "Use los números mostrados para identificar elementos en el archivo CSV.\n" +
-                   "Nodos: círculos numerados | Elementos: números en barras",
+                   "Nodos: círculos numerados | Elementos: números en barras\n" +
+                   "NOTA: Los volados se muestran mejor en la visualización nativa anterior.",
                    fontsize=10, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow"))
         
         # Maximizar la ventana de referencia
@@ -84,20 +184,22 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
             pass
         
         # No hacer plt.show() aquí para mantener la figura abierta
-        print("✓ Figura de referencia creada (permanece abierta para consulta)")
+        print("✓ Figura de referencia OPSVIS creada (permanece abierta para consulta)")
         print("  → Use los números mostrados para identificar elementos en el CSV")
 
     except Exception as e:
         print(f"✗ Error en la visualización del modelo con etiquetas: {e}")
-        print("Intentando visualización simple del modelo...")
-        try:
-            reference_figure = plt.figure(figsize=fig_wi_he)
-            opsv.plot_model(node_labels=1, element_labels=1)
-            plt.title(f"MODELO DE REFERENCIA - Edificio de {num_floor} plantas\nVisualización Simple con Etiquetas")
-            print("✓ Visualización simple del modelo con etiquetas completada!")
-        except Exception as e2:
-            print(f"✗ Error en visualización simple del modelo: {e2}")
-            reference_figure = None
+        print("Usando solo visualización nativa...")
+        if native_fig is None:
+            print("Intentando visualización simple del modelo...")
+            try:
+                reference_figure = plt.figure(figsize=fig_wi_he)
+                opsv.plot_model(node_labels=1, element_labels=1)
+                plt.title(f"MODELO DE REFERENCIA - Edificio de {num_floor} plantas\nVisualización Simple con Etiquetas")
+                print("✓ Visualización simple del modelo con etiquetas completada!")
+            except Exception as e2:
+                print(f"✗ Error en visualización simple del modelo: {e2}")
+                reference_figure = None
 
     print("\n=== VISUALIZACIÓN DE LA FORMA DEFORMADA ===\n")
     try:

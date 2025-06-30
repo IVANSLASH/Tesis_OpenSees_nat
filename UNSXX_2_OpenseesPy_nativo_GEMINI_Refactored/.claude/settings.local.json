@@ -5,7 +5,8 @@
       "Bash(rg:*)",
       "WebFetch(domain:opsvis.readthedocs.io)",
       "WebFetch(domain:openseespydoc.readthedocs.io)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

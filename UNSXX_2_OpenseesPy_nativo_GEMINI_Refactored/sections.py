@@ -239,7 +239,7 @@ def get_section_input(element_type, interactive=True):
                 except ValueError as e:
                     print(f"Error: {e}")
 
-def define_sections(interactive=True, material_choice=None):
+def define_sections(interactive=True, material_choice=None, skip_columns=False):
     """
     Define las propiedades de los materiales y las secciones transversales
     de columnas, vigas y losas con opciones personalizables.
@@ -247,6 +247,7 @@ def define_sections(interactive=True, material_choice=None):
     Args:
         interactive (bool): Si True, solicita entrada del usuario para personalización
         material_choice (str): Clave del material predefinido (opcional)
+        skip_columns (bool): Si True, omite la configuración de columnas
 
     Returns:
         dict: Un diccionario con todas las propiedades de las secciones.
@@ -282,7 +283,7 @@ def define_sections(interactive=True, material_choice=None):
     print(f"  - Densidad: {selected_material.density} kg/m³")
     
     # Configuración de secciones
-    if interactive:
+    if interactive and not skip_columns:
         print("\n¿Desea personalizar las dimensiones de las secciones?")
         customize = input("Ingrese 's' para personalizar o cualquier otra tecla para usar valores por defecto: ").lower().strip()
         interactive_sections = customize in ['s', 'si', 'sí', 'y', 'yes']
@@ -290,7 +291,14 @@ def define_sections(interactive=True, material_choice=None):
         interactive_sections = False
     
     # Obtener dimensiones de secciones
-    col_dimensions = get_section_input("columna", interactive_sections)
+    if skip_columns:
+        print("\n  Las columnas ya fueron configuradas en configuraciones avanzadas.")
+        print("  Configurando solo vigas y losas...")
+        # Usar dimensiones por defecto para columnas
+        col_dimensions = {"b": 0.30, "h": 0.60, "type": "rectangular"}
+    else:
+        col_dimensions = get_section_input("columna", interactive_sections)
+    
     beam_dimensions = get_section_input("viga", interactive_sections)
     slab_dimensions = get_section_input("losa", interactive_sections)
     
