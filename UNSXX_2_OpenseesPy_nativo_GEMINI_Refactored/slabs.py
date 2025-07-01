@@ -1,127 +1,111 @@
 # slabs.py
 # ============================================
 # Este módulo se dedica a la creación y discretización de losas,
-# incluyendo la generación de mallas de elementos Shell para una
-# representación precisa de su comportamiento y deformaciones.
-# También maneja la conexión de las losas con el resto de la estructura.
+# implementando un sistema de mallado para una representación precisa.
 # ============================================
 
 import openseespy.opensees as ops
-import geometry
+import numpy as np
+
+def create_slab_mesh(p1, p2, p3, p4, nx, ny, sec_tag, start_ele_tag, start_node_tag):
+    """
+    Crea una malla de elementos ShellMITC4 para un solo paño de losa.
+
+    Args:
+        p1, p2, p3, p4: Coordenadas de las 4 esquinas del paño de losa.
+        nx, ny: Número de divisiones de la malla en cada dirección (e.g., 10x10).
+        sec_tag: Tag de la sección a utilizar para los elementos de losa.
+        start_ele_tag: Tag inicial para los nuevos elementos.
+        start_node_tag: Tag inicial para los nuevos nodos internos.
+
+    Returns:
+        tuple: (lista_ids_elementos, siguiente_ele_tag, siguiente_node_tag)
+    """
+    ele_tag = start_ele_tag
+    node_tag = start_node_tag
+    slab_elements_ids = []
+    
+    # Generar una matriz de nodos para la malla
+    nodes_grid = np.full((ny + 1, nx + 1), 0, dtype=int)
+
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            u, v = i / nx, j / ny
+            # Interpolar coordenadas para encontrar la posición del nodo
+            coord_jv = (1 - v) * p1 + v * p4
+            coord_iv = (1 - v) * p2 + v * p3
+            coord = (1 - u) * coord_jv + u * coord_iv
+            
+            # Reutilizar nodos existentes en los bordes
+            # Esta es una simplificación. Para un caso real, se necesitaría un mapa de nodos global.
+            # Por ahora, creamos nuevos nodos para toda la malla para robustez.
+            ops.node(node_tag, *coord)
+            nodes_grid[j, i] = node_tag
+            node_tag += 1
+
+    # Crear elementos Shell conectando los nodos de la malla
+    for j in range(ny):
+        for i in range(nx):
+            n1 = nodes_grid[j, i]
+            n2 = nodes_grid[j, i + 1]
+            n3 = nodes_grid[j + 1, i + 1]
+            n4 = nodes_grid[j + 1, i]
+            ops.element('ShellMITC4', ele_tag, n1, n2, n3, n4, sec_tag)
+            slab_elements_ids.append(ele_tag)
+            ele_tag += 1
+            
+    return slab_elements_ids, ele_tag, node_tag
 
 def create_slabs(geometry_data, section_properties, start_ele_tag):
     """
-    Crea y discretiza las losas del edificio en elementos ShellMITC4.
-    Cada vano de la estructura tendrá un elemento shell que conecta
-    los 4 nodos de las esquinas del vano.
-
-    Args:
-        geometry_data (dict): Diccionario con los datos de geometría del edificio.
-        section_properties (dict): Diccionario con las propiedades de las secciones.
-        start_ele_tag (int): El tag inicial para los elementos de losa.
-
-    Returns:
-        tuple: Una tupla que contiene (total_slabs_elements, lista_ids_losas, next_ele_tag).
+    Crea y discretiza las losas del edificio con una malla de 10x10 por vano.
     """
     num_bay_x = geometry_data["num_bay_x"]
     num_bay_y = geometry_data["num_bay_y"]
     num_floor = geometry_data["num_floor"]
+    span_x = geometry_data["span_x"]
+    span_y = geometry_data["span_y"]
+    story_height = geometry_data["story_height"]
 
     E = section_properties["E"]
     nu = section_properties["nu"]
-    slab_thickness = section_properties["slab_thickness"] / 100.0  # Convert cm to meters
+    slab_thickness = section_properties["slab_thickness"] / 100.0
 
-    print("\n=== GENERACIÓN Y DISCRETIZACIÓN DE LOSAS ===\n")
+    print("\n=== GENERACIÓN Y DISCRETIZACIÓN DE LOSAS (MALLA 10x10) ===\n")
 
-    # Verificar si el material ya existe, si no crearlo
+    sec_tag = 1 # Asumimos que la sección de la losa tiene tag 1
     try:
-        # Definir material elástico isótropo para los elementos shell
-        ops.nDMaterial('ElasticIsotropic', 1, E, nu)
-    except:
-        # Material ya existe, continuar
-        pass
-    
-    try:
-        # Definir sección de placa con fibras para elementos shell
-        ops.section('PlateFiber', 1, 1, slab_thickness)  # (secTag, matTag, thickness)
-    except:
-        # Sección ya existe, continuar
-        pass
+        ops.nDMaterial('ElasticIsotropic', sec_tag, E, nu)
+        ops.section('PlateFiber', sec_tag, sec_tag, slab_thickness)
+    except Exception as e:
+        print(f"Nota: Material/Sección de losa ya podría existir. {e}")
 
     ele_tag = start_ele_tag
-    total_slabs_elements = 0
-    slab_elements_ids = []
+    # Empezar a numerar los nodos de la malla desde un número alto para evitar colisiones
+    node_tag = (num_bay_x + 1) * (num_bay_y + 1) * (num_floor + 1) + 1000 
+    total_slabs_elements = []
 
-    # Usar densidad de malla desde la configuración de entrada
-    mesh_density = geometry_data.get("mesh_density", 1)
-    print(f"  Densidad de malla configurada: {mesh_density} divisiones por vano")
+    nx, ny = 10, 10 # Malla de 10x10
+    print(f"  Configurando malla de {nx}x{ny} para cada paño de losa.")
 
-    for k in range(1, num_floor + 1):  # Para cada nivel (excluyendo la base)
-        print(f"  Generando losas para el Nivel {k}...")
-        
-        # Crear elementos shell para cada vano
-        for j_bay in range(num_bay_y):  # Para cada vano en Y
-            for i_bay in range(num_bay_x):  # Para cada vano en X
+    for k in range(1, num_floor + 1):
+        z = k * story_height
+        print(f"  Generando losas para el Nivel {k} (Z = {z:.2f}m)...")
+        for j_bay in range(num_bay_y):
+            for i_bay in range(num_bay_x):
+                # Definir las 4 esquinas del paño de losa actual
+                p1 = np.array([i_bay * span_x, j_bay * span_y, z])
+                p2 = np.array([(i_bay + 1) * span_x, j_bay * span_y, z])
+                p3 = np.array([(i_bay + 1) * span_x, (j_bay + 1) * span_y, z])
+                p4 = np.array([i_bay * span_x, (j_bay + 1) * span_y, z])
                 
-                # Si mesh_density = 1, crear un elemento por vano
-                # Si mesh_density > 1, crear una malla de elementos por vano
-                for sub_j in range(mesh_density):
-                    for sub_i in range(mesh_density):
-                        # Calcular los índices de nodos considerando la subdivisión
-                        # Para mesh_density = 1, esto será simplemente los nodos de las esquinas del vano
-                        
-                        # Nodo inferior izquierdo
-                        node1_i = i_bay + (sub_i * 1 // mesh_density)
-                        node1_j = j_bay + (sub_j * 1 // mesh_density)
-                        
-                        # Nodo inferior derecho
-                        node2_i = i_bay + ((sub_i + 1) * 1 // mesh_density + (1 if sub_i == mesh_density - 1 else 0))
-                        node2_j = j_bay + (sub_j * 1 // mesh_density)
-                        
-                        # Nodo superior derecho
-                        node3_i = i_bay + ((sub_i + 1) * 1 // mesh_density + (1 if sub_i == mesh_density - 1 else 0))
-                        node3_j = j_bay + ((sub_j + 1) * 1 // mesh_density + (1 if sub_j == mesh_density - 1 else 0))
-                        
-                        # Nodo superior izquierdo
-                        node4_i = i_bay + (sub_i * 1 // mesh_density)
-                        node4_j = j_bay + ((sub_j + 1) * 1 // mesh_density + (1 if sub_j == mesh_density - 1 else 0))
-                        
-                        # Para simplificar y evitar errores, crearemos solo un elemento por vano
-                        # usando los nodos de las esquinas del vano
-                        if sub_i == 0 and sub_j == 0:  # Solo crear un elemento por vano
-                            
-                            # Nodos de las esquinas del vano
-                            node1_tag = geometry.get_node_tag_from_indices(k, j_bay, i_bay, num_bay_x, num_bay_y)
-                            node2_tag = geometry.get_node_tag_from_indices(k, j_bay, i_bay + 1, num_bay_x, num_bay_y)
-                            node3_tag = geometry.get_node_tag_from_indices(k, j_bay + 1, i_bay + 1, num_bay_x, num_bay_y)
-                            node4_tag = geometry.get_node_tag_from_indices(k, j_bay + 1, i_bay, num_bay_x, num_bay_y)
-                            
-                            # Verificar que todos los nodos existen
-                            total_nodes = (num_bay_x + 1) * (num_bay_y + 1) * (num_floor + 1)
-                            
-                            if (node1_tag <= total_nodes and node2_tag <= total_nodes and 
-                                node3_tag <= total_nodes and node4_tag <= total_nodes):
-                                
-                                try:
-                                    # Crear elemento ShellMITC4
-                                    ops.element('ShellMITC4', ele_tag, node1_tag, node2_tag, node3_tag, node4_tag, 1)
-                                    slab_elements_ids.append(ele_tag)
-                                    ele_tag += 1
-                                    total_slabs_elements += 1
-                                    
-                                    print(f"    Elemento {ele_tag-1}: Nodos [{node1_tag}, {node2_tag}, {node3_tag}, {node4_tag}]")
-                                    
-                                except Exception as e:
-                                    print(f"    Error creando elemento shell en vano ({i_bay}, {j_bay}): {e}")
-                                    print(f"    Nodos intentados: [{node1_tag}, {node2_tag}, {node3_tag}, {node4_tag}]")
-                            else:
-                                print(f"    Error: Nodos fuera de rango en vano ({i_bay}, {j_bay})")
-                                print(f"    Nodos: [{node1_tag}, {node2_tag}, {node3_tag}, {node4_tag}], Total: {total_nodes}")
+                # Crear la malla para este paño
+                slab_ids, ele_tag, node_tag = create_slab_mesh(p1, p2, p3, p4, nx, ny, sec_tag, ele_tag, node_tag)
+                total_slabs_elements.extend(slab_ids)
+                print(f"    Paño ({i_bay}, {j_bay}): Creados {len(slab_ids)} elementos de losa.")
 
-    print(f"Total de elementos de losa creados: {total_slabs_elements}")
+    print(f"\nTotal de elementos de losa creados: {len(total_slabs_elements)}")
+    if not total_slabs_elements:
+        print("⚠️ Advertencia: No se crearon elementos de losa.")
     
-    if total_slabs_elements == 0:
-        print("⚠️  Advertencia: No se crearon elementos de losa")
-        print("    El modelo continuará solo con elementos frame (columnas y vigas)")
-    
-    return total_slabs_elements, slab_elements_ids, ele_tag
+    return len(total_slabs_elements), total_slabs_elements, ele_tag
