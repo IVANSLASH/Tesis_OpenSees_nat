@@ -69,9 +69,10 @@ def generate_enhanced_nodes(geometry_data, cantilever_config):
                 should_create_node = True
                 
                 if k == 0:
-                    # Nivel 0: Solo nodos de la estructura original
-                    if (i >= len(x_coords) or j >= len(y_coords) or 
-                        (cantilever_config['left'] and j == 0)):
+                    # Nivel 0: SOLO nodos de la estructura original (NO volados en la base)
+                    # Los volados empiezan desde el primer nivel para no interferir con cimentaciones
+                    effective_j = j - (1 if cantilever_config['left'] else 0)
+                    if (i >= len(x_coords) or effective_j >= len(y_coords) or effective_j < 0):
                         should_create_node = False
                         
                 elif k == 1:
@@ -230,6 +231,7 @@ def generate_enhanced_beam_elements(node_mapping, geometry_data, cantilever_conf
                                   extended_x_coords, extended_y_coords, z_coords, start_element_id):
     """
     Genera elementos de viga incluyendo vigas de borde para volados.
+    SOLO genera vigas ortogonales en el mismo nivel.
     """
     bay_widths_x = geometry_data["bay_widths_x"]
     bay_widths_y = geometry_data["bay_widths_y"]
@@ -241,7 +243,7 @@ def generate_enhanced_beam_elements(node_mapping, geometry_data, cantilever_conf
     cantilever_beam_ids = []
     element_id = start_element_id
     
-    print(f"  Generando vigas principales y de volados...")
+    print(f"  Generando vigas principales y de volados (SOLO ORTOGONALES)...")
     
     # Crear material para vigas principales (usar sección del geometry_data)
     section_properties = geometry_data.get('section_properties', {})
@@ -295,10 +297,16 @@ def generate_enhanced_beam_elements(node_mapping, geometry_data, cantilever_conf
                 node2 = node_mapping.get((i + 1, j_adjusted, k))
                 
                 if node1 and node2:
-                    ops.element('elasticBeamColumn', element_id, node1, node2,
-                              beam_section_tag, 2)  # sección beam_section_tag, transformación 2
-                    beam_elements_x_ids.append(element_id)
-                    element_id += 1
+                    # Verificar que los nodos están en la misma línea Y (ortogonal)
+                    coord1 = ops.nodeCoord(node1)
+                    coord2 = ops.nodeCoord(node2)
+                    if abs(coord1[1] - coord2[1]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                        ops.element('elasticBeamColumn', element_id, node1, node2,
+                                  beam_section_tag, 2)  # sección beam_section_tag, transformación 2
+                        beam_elements_x_ids.append(element_id)
+                        element_id += 1
+                    else:
+                        print(f"      ⚠️ Saltando viga diagonal: nodos {node1}-{node2}")
         
         # VIGAS EN DIRECCIÓN Y (entre columnas de la estructura original)
         for i in range(original_x_count):  # En cada línea X
@@ -310,101 +318,112 @@ def generate_enhanced_beam_elements(node_mapping, geometry_data, cantilever_conf
                 node2 = node_mapping.get((i, j_adjusted + 1, k))
                 
                 if node1 and node2:
-                    ops.element('elasticBeamColumn', element_id, node1, node2,
-                              beam_section_tag, 3)  # sección beam_section_tag, transformación 3
-                    beam_elements_y_ids.append(element_id)
-                    element_id += 1
+                    # Verificar que los nodos están en la misma línea X (ortogonal)
+                    coord1 = ops.nodeCoord(node1)
+                    coord2 = ops.nodeCoord(node2)
+                    if abs(coord1[0] - coord2[0]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                        ops.element('elasticBeamColumn', element_id, node1, node2,
+                                  beam_section_tag, 3)  # sección beam_section_tag, transformación 3
+                        beam_elements_y_ids.append(element_id)
+                        element_id += 1
+                    else:
+                        print(f"      ⚠️ Saltando viga diagonal: nodos {node1}-{node2}")
         
-        # VIGAS DE VOLADOS (desde nivel 1 para estabilidad)
+        # VIGAS DE VOLADOS (SOLO ORTOGONALES, desde nivel 1 para estabilidad)
         if level >= 1:
             
-            # Volado frontal
+            # Volado frontal - SOLO vigas ortogonales (conectan estructura principal con volado)
             if cantilever_config['front']:
-                front_x_idx = len(extended_x_coords) - 1
+                # Conectar la estructura principal con el volado frontal en cada fila Y
                 for j in range(original_y_count):
                     j_adjusted = j + y_offset
                     
-                    # Viga desde último nodo estructura a nodo volado
-                    node1 = node_mapping.get((original_x_count - 1, j_adjusted, k))
-                    node2 = node_mapping.get((front_x_idx, j_adjusted, k))
+                    # Conectar último nodo de estructura con primer nodo de volado en misma fila Y
+                    node1 = node_mapping.get((original_x_count - 1, j_adjusted, k))  # Último de estructura
+                    node2 = node_mapping.get((len(extended_x_coords) - 1, j_adjusted, k))  # Nodo de volado
                     
                     if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  101, 2)  # sección 101, transformación 2
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
+                        # Verificar que los nodos están en la misma línea Y y Z (ortogonal en X)
+                        coord1 = ops.nodeCoord(node1)
+                        coord2 = ops.nodeCoord(node2)
+                        if abs(coord1[1] - coord2[1]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                            ops.element('elasticBeamColumn', element_id, node1, node2,
+                                      101, 2)  # sección 101, transformación 2 (para vigas en X)
+                            cantilever_beam_ids.append(element_id)
+                            element_id += 1
+                        else:
+                            print(f"      ⚠️ Saltando viga diagonal de volado frontal: nodos {node1}-{node2}")
                 
-                # Viga de borde frontal (conecta nodos del volado frontal)
-                for j in range(original_y_count - 1):
-                    j_adjusted = j + y_offset
-                    
-                    node1 = node_mapping.get((front_x_idx, j_adjusted, k))
-                    node2 = node_mapping.get((front_x_idx, j_adjusted + 1, k))
-                    
-                    if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  101, 3)  # sección 101, transformación 3
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
+                # Viga de borde frontal (solo si hay múltiples nodos Y en el volado)
+                if original_y_count > 1:
+                    front_x_idx = len(extended_x_coords) - 1
+                    for j in range(original_y_count - 1):
+                        j_adjusted = j + y_offset
+                        
+                        node1 = node_mapping.get((front_x_idx, j_adjusted, k))
+                        node2 = node_mapping.get((front_x_idx, j_adjusted + 1, k))
+                        
+                        if node1 and node2:
+                            # Verificar que los nodos están en la misma línea X y Z (ortogonal en Y)
+                            coord1 = ops.nodeCoord(node1)
+                            coord2 = ops.nodeCoord(node2)
+                            if abs(coord1[0] - coord2[0]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                                ops.element('elasticBeamColumn', element_id, node1, node2,
+                                          101, 3)  # sección 101, transformación 3 (para vigas en Y)
+                                cantilever_beam_ids.append(element_id)
+                                element_id += 1
+                            else:
+                                print(f"      ⚠️ Saltando viga diagonal de volado frontal: nodos {node1}-{node2}")
             
-            # Volado lateral derecho
+            # Volado lateral derecho - SOLO vigas ortogonales
             if cantilever_config['right']:
                 right_y_idx = len(extended_y_coords) - 1
-                for i in range(original_x_count):
-                    
-                    # Viga desde último nodo estructura a nodo volado
-                    node1 = node_mapping.get((i, original_y_count - 1 + y_offset, k))
-                    node2 = node_mapping.get((i, right_y_idx, k))
-                    
-                    if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  102, 3)  # sección 102, transformación 3
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
                 
-                # Viga de borde derecha
+                # Viga de borde derecha (conecta nodos del volado derecho en dirección X)
                 for i in range(original_x_count - 1):
                     node1 = node_mapping.get((i, right_y_idx, k))
                     node2 = node_mapping.get((i + 1, right_y_idx, k))
                     
                     if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  102, 2)  # sección 102, transformación 2
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
+                        # Verificar que los nodos están en la misma línea Y (ortogonal)
+                        coord1 = ops.nodeCoord(node1)
+                        coord2 = ops.nodeCoord(node2)
+                        if abs(coord1[1] - coord2[1]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                            ops.element('elasticBeamColumn', element_id, node1, node2,
+                                      102, 2)  # sección 102, transformación 2
+                            cantilever_beam_ids.append(element_id)
+                            element_id += 1
+                        else:
+                            print(f"      ⚠️ Saltando viga diagonal de volado derecho: nodos {node1}-{node2}")
             
-            # Volado lateral izquierdo
+            # Volado lateral izquierdo - SOLO vigas ortogonales
             if cantilever_config['left']:
                 left_y_idx = 0
-                for i in range(original_x_count):
-                    
-                    # Viga desde primer nodo estructura a nodo volado
-                    node1 = node_mapping.get((i, y_offset, k))
-                    node2 = node_mapping.get((i, left_y_idx, k))
-                    
-                    if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  103, 3)  # sección 103, transformación 3
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
                 
-                # Viga de borde izquierda
+                # Viga de borde izquierda (conecta nodos del volado izquierdo en dirección X)
                 for i in range(original_x_count - 1):
                     node1 = node_mapping.get((i, left_y_idx, k))
                     node2 = node_mapping.get((i + 1, left_y_idx, k))
                     
                     if node1 and node2:
-                        ops.element('elasticBeamColumn', element_id, node1, node2,
-                                  103, 2)  # sección 103, transformación 2
-                        cantilever_beam_ids.append(element_id)
-                        element_id += 1
+                        # Verificar que los nodos están en la misma línea Y (ortogonal)
+                        coord1 = ops.nodeCoord(node1)
+                        coord2 = ops.nodeCoord(node2)
+                        if abs(coord1[1] - coord2[1]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
+                            ops.element('elasticBeamColumn', element_id, node1, node2,
+                                      103, 2)  # sección 103, transformación 2
+                            cantilever_beam_ids.append(element_id)
+                            element_id += 1
+                        else:
+                            print(f"      ⚠️ Saltando viga diagonal de volado izquierdo: nodos {node1}-{node2}")
     
     print(f"    ✅ {len(beam_elements_x_ids)} vigas en X, {len(beam_elements_y_ids)} vigas en Y")
-    print(f"    ✅ {len(cantilever_beam_ids)} vigas de volado generadas")
+    print(f"    ✅ {len(cantilever_beam_ids)} vigas de volado ortogonales generadas")
+    print(f"    ✅ TODAS las vigas son ortogonales y están en el mismo nivel")
     
     # Debug: Mostrar información de elementos de volado
     if cantilever_beam_ids:
-        print(f"\n    🔍 VERIFICACIÓN DE ELEMENTOS DE VOLADO:")
+        print(f"\n    🔍 VERIFICACIÓN DE ELEMENTOS DE VOLADO (ORTOGONALES):")
         for i, elem_id in enumerate(cantilever_beam_ids[:5]):  # Primeros 5 elementos
             try:
                 nodes = ops.eleNodes(elem_id)
@@ -413,6 +432,16 @@ def generate_enhanced_beam_elements(node_mapping, geometry_data, cantilever_conf
                 print(f"      Elemento {elem_id}: Nodos {nodes[0]}-{nodes[1]}")
                 print(f"        Nodo {nodes[0]}: ({coord1[0]:.2f}, {coord1[1]:.2f}, {coord1[2]:.2f})")
                 print(f"        Nodo {nodes[1]}: ({coord2[0]:.2f}, {coord2[1]:.2f}, {coord2[2]:.2f})")
+                # Verificar ortogonalidad
+                dx = abs(coord1[0] - coord2[0])
+                dy = abs(coord1[1] - coord2[1])
+                dz = abs(coord1[2] - coord2[2])
+                if dx > 0.001 and dy > 0.001:
+                    print(f"        ⚠️ ADVERTENCIA: Viga diagonal detectada!")
+                elif dz > 0.001:
+                    print(f"        ⚠️ ADVERTENCIA: Viga inclinada detectada!")
+                else:
+                    print(f"        ✅ Viga ortogonal confirmada")
             except Exception as e:
                 print(f"      Error verificando elemento {elem_id}: {e}")
     
@@ -472,12 +501,25 @@ def apply_enhanced_boundary_conditions(node_mapping, extended_x_coords, extended
     if cantilever_config['left']:
         original_y_count -= 1
         
-    # Aplicar restricciones en la base (nivel 0)
+    # Aplicar restricciones en la base (nivel 0) - SOLO estructura original
     restricted_nodes = 0
     y_offset = 1 if cantilever_config['left'] else 0
     
-    for i in range(original_x_count):
-        for j in range(original_y_count):
+    # Calcular dimensiones reales de estructura original (sin volados)
+    actual_x_count = len(extended_x_coords)
+    actual_y_count = len(extended_y_coords)
+    
+    # Ajustar si hay volados
+    if cantilever_config['front']:
+        actual_x_count -= 1
+    if cantilever_config['right']:
+        actual_y_count -= 1
+    if cantilever_config['left']:
+        actual_y_count -= 1
+    
+    # SOLO restringir nodos de la estructura original en la base
+    for i in range(actual_x_count):
+        for j in range(actual_y_count):
             j_adjusted = j + y_offset
             node_id = node_mapping.get((i, j_adjusted, 0))
             

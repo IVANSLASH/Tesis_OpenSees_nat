@@ -1,0 +1,84 @@
+Metadata-Version: 2.2
+Name: openseespy
+Version: 3.7.1.2
+Summary: A OpenSeesPy package
+Home-page: https://github.com/zhuminjie/openseespy
+Author: Minjie Zhu
+Author-email: zhum@oregonstate.edu
+License: OpenSeesPy is free for research, education, and internal use. Commercial redistribution of OpenSeesPy, such as, but not limited to, an application or cloud-based service that uses import openseespy, requires a license similar to that required for commercial redistribution of OpenSees.exe. Contact Dr. Minjie Zhu (zhum@oregonstate.edu) for commercial licensing details.
+Platform: Linux
+Platform: Windows
+Platform: Mac
+Classifier: Programming Language :: Python
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: MacOS :: MacOS X
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: openseespywin>=3.7.1.2; platform_system == "Windows"
+Requires-Dist: openseespylinux>=3.7.1.2; platform_system == "Linux"
+Requires-Dist: openseespymac>=3.4.0.2; platform_system == "Darwin"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: platform
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# OpenSeesPy
+
+Pip Package for OpenSeesPy
+
+## Installation
+
+```bash
+python3 -m pip install openseespy
+```
+
+## Import
+
+```python
+import openseespy.opensees as ops
+```
+
+## Upgrade
+
+```bash
+python3 -m pip install openseespy --upgrade --no-cache
+```
+
+## Documentation
+
+**Linux and Windows versions maintained by:**
+
+Minjie Zhu <zhum@oregonstate.edu>
+
+Civil and Construction Engineering
+
+Oregon State University
+
+**Mac version maintained by:**
+
+Dr. Stevan Gavrilovic <gavrilovic@berkeley.edu>
+
+Structural and Earthquake Engineering 
+
+University of California, Berkeley
+
+[OpenSeesPy Documentation](https://openseespydoc.readthedocs.io/en/latest/index.html)
+
+[OpenSeesPy Source Code](github.com/OpenSees/OpenSees)
+
+## Issues
+
+Any issues for installation and running the pip package, please
+report to
+[OpenSeesPy Github Page](https://github.com/zhuminjie/OpenSeesPy).
+
+Any issues and bugs in `OpenSees` should be
+reported on the [OpenSees GitHub Page](https://github.com/OpenSees/OpenSees).

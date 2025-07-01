@@ -239,6 +239,147 @@ def get_section_input(element_type, interactive=True):
                 except ValueError as e:
                     print(f"Error: {e}")
 
+def get_beam_section_configuration(interactive=True):
+    """
+    Solicita al usuario el tipo de configuración de vigas.
+    
+    Returns:
+        dict: Configuración de secciones de vigas
+    """
+    if not interactive:
+        return {
+            'type': 'uniform',
+            'beam_x': {"b": 0.20, "h": 0.35, "type": "rectangular"},
+            'beam_y': {"b": 0.20, "h": 0.35, "type": "rectangular"}
+        }
+    
+    print("\n=== CONFIGURACIÓN DE SECCIONES DE VIGAS ===")
+    print("Opciones disponibles:")
+    print("1. Todas las vigas iguales (misma sección)")
+    print("2. Vigas X diferentes a vigas Y")
+    
+    while True:
+        try:
+            choice = int(input("Seleccione una opción (1-2): "))
+            if choice in [1, 2]:
+                break
+            else:
+                print("Seleccione 1 o 2")
+        except ValueError:
+            print("Por favor ingrese un número válido")
+    
+    if choice == 1:
+        # Todas las vigas iguales
+        print("\n--- Configurando sección única para todas las vigas ---")
+        beam_section = get_section_input("viga", True)
+        return {
+            'type': 'uniform',
+            'beam_x': beam_section,
+            'beam_y': beam_section
+        }
+    else:
+        # Vigas X diferentes a vigas Y
+        print("\n--- Configurando vigas en dirección X ---")
+        beam_x_section = get_section_input("viga_x", True)
+        
+        print("\n--- Configurando vigas en dirección Y ---")
+        beam_y_section = get_section_input("viga_y", True)
+        
+        return {
+            'type': 'directional',
+            'beam_x': beam_x_section,
+            'beam_y': beam_y_section
+        }
+
+def get_section_input(element_type, interactive=True):
+    """
+    Solicita al usuario las dimensiones de una sección o usa valores por defecto.
+    
+    Args:
+        element_type (str): Tipo de elemento ('columna', 'viga', 'viga_x', 'viga_y', 'losa')
+        interactive (bool): Si True, solicita entrada del usuario
+    
+    Returns:
+        dict: Dimensiones de la sección
+    """
+    if not interactive:
+        # Valores por defecto en metros (sistema internacional)
+        defaults = {
+            "columna": {"b": 0.30, "h": 0.60, "type": "rectangular"},
+            "viga": {"b": 0.20, "h": 0.35, "type": "rectangular"},
+            "viga_x": {"b": 0.20, "h": 0.35, "type": "rectangular"},
+            "viga_y": {"b": 0.20, "h": 0.35, "type": "rectangular"},
+            "losa": {"thickness": 0.20}  # 20 cm = 0.20 m
+        }
+        return defaults.get(element_type, defaults["viga"])
+    
+    # Mapear nombres de elementos para mostrar
+    display_names = {
+        "columna": "COLUMNA",
+        "viga": "VIGA",
+        "viga_x": "VIGA EN DIRECCIÓN X",
+        "viga_y": "VIGA EN DIRECCIÓN Y",
+        "losa": "LOSA"
+    }
+    
+    print(f"\n--- Configuración de sección para {display_names.get(element_type, element_type.upper())} ---")
+    
+    if element_type == "losa":
+        while True:
+            try:
+                print("NOTA: Dimensiones en metros (sistema internacional)")
+                thickness = float(input("Espesor de la losa (0.10-0.50 m): "))
+                if 0.10 <= thickness <= 0.50:
+                    return {"thickness": thickness}
+                else:
+                    print("El espesor debe estar entre 0.10 y 0.50 m")
+            except ValueError:
+                print("Por favor ingrese un número válido")
+    else:
+        print("Tipos de sección disponibles:")
+        print("1. Rectangular")
+        print("2. Circular")
+        
+        while True:
+            try:
+                choice = int(input("Seleccione el tipo de sección (1-2): "))
+                if choice in [1, 2]:
+                    break
+                else:
+                    print("Seleccione 1 o 2")
+            except ValueError:
+                print("Por favor ingrese un número válido")
+        
+        if choice == 1:  # Rectangular
+            while True:
+                try:
+                    if element_type == "columna":
+                        print("NOTA: Dimensiones en metros (sistema internacional)")
+                        b = float(input("Ancho de la columna en X (0.15-1.00 m): "))
+                        h = float(input("Ancho de la columna en Y (0.15-1.00 m): "))
+                    else:  # viga, viga_x, viga_y
+                        print("NOTA: Dimensiones en metros (sistema internacional)")
+                        element_display = display_names.get(element_type, "viga").lower()
+                        b = float(input(f"Ancho de la {element_display} (0.15-0.50 m): "))
+                        h = float(input(f"Altura de la {element_display} (0.20-1.00 m): "))
+                    
+                    dimensions = {"b": b, "h": h, "type": "rectangular"}
+                    validate_section_dimensions(dimensions, "rectangular")
+                    return dimensions
+                except ValueError as e:
+                    print(f"Error: {e}")
+        
+        else:  # Circular
+            while True:
+                try:
+                    print("NOTA: Dimensiones en metros (sistema internacional)")
+                    d = float(input("Diámetro de la sección (0.15-1.00 m): "))
+                    dimensions = {"d": d, "type": "circular"}
+                    validate_section_dimensions(dimensions, "circular")
+                    return dimensions
+                except ValueError as e:
+                    print(f"Error: {e}")
+
 def define_sections(interactive=True, material_choice=None, skip_columns=False):
     """
     Define las propiedades de los materiales y las secciones transversales
@@ -299,7 +440,8 @@ def define_sections(interactive=True, material_choice=None, skip_columns=False):
     else:
         col_dimensions = get_section_input("columna", interactive_sections)
     
-    beam_dimensions = get_section_input("viga", interactive_sections)
+    # Configuración de vigas (SIEMPRE solicitar en modo interactivo)
+    beam_config = get_beam_section_configuration(interactive)
     slab_dimensions = get_section_input("losa", interactive_sections)
     
     # Calcular propiedades geométricas
@@ -310,35 +452,70 @@ def define_sections(interactive=True, material_choice=None, skip_columns=False):
         col_properties = calculate_rectangular_properties(col_dimensions["b"], col_dimensions["h"])
         col_properties.update({"type": "rectangular"})
     
-    if beam_dimensions.get("type") == "circular":
-        beam_properties = calculate_circular_properties(beam_dimensions["d"])
-        beam_properties.update({"type": "circular"})
+    # Calcular propiedades de vigas X
+    beam_x_dimensions = beam_config['beam_x']
+    if beam_x_dimensions.get("type") == "circular":
+        beam_x_properties = calculate_circular_properties(beam_x_dimensions["d"])
+        beam_x_properties.update({"type": "circular"})
     else:
-        beam_properties = calculate_rectangular_properties(beam_dimensions["b"], beam_dimensions["h"])
-        beam_properties.update({"type": "rectangular"})
+        beam_x_properties = calculate_rectangular_properties(beam_x_dimensions["b"], beam_x_dimensions["h"])
+        beam_x_properties.update({"type": "rectangular"})
+    
+    # Calcular propiedades de vigas Y
+    beam_y_dimensions = beam_config['beam_y']
+    if beam_y_dimensions.get("type") == "circular":
+        beam_y_properties = calculate_circular_properties(beam_y_dimensions["d"])
+        beam_y_properties.update({"type": "circular"})
+    else:
+        beam_y_properties = calculate_rectangular_properties(beam_y_dimensions["b"], beam_y_dimensions["h"])
+        beam_y_properties.update({"type": "rectangular"})
     
     # Mostrar resumen de propiedades calculadas
     print("\n=== PROPIEDADES GEOMÉTRICAS CALCULADAS ===")
     
+    # Convertir a cm para mostrar dimensiones más legibles
     if col_properties["type"] == "rectangular":
-        print(f"Columnas ({col_properties['b']} x {col_properties['h']} cm):")
+        print(f"Columnas ({col_properties['b']*100:.0f} x {col_properties['h']*100:.0f} cm):")
     else:
-        print(f"Columnas (Ø {col_properties['d']} cm):")
-    print(f"  - Área: {col_properties['A']:.2f} cm²")
-    print(f"  - Iz: {col_properties['Iz']:.2f} cm⁴")
-    print(f"  - Iy: {col_properties['Iy']:.2f} cm⁴")
-    print(f"  - J: {col_properties['J']:.2f} cm⁴")
+        print(f"Columnas (Ø {col_properties['d']*100:.0f} cm):")
+    print(f"  - Área: {col_properties['A']*10000:.0f} cm²")  # m² a cm²
+    print(f"  - Iz: {col_properties['Iz']*100000000:.0f} cm⁴")  # m⁴ a cm⁴
+    print(f"  - Iy: {col_properties['Iy']*100000000:.0f} cm⁴")  # m⁴ a cm⁴
+    print(f"  - J: {col_properties['J']*100000000:.0f} cm⁴")   # m⁴ a cm⁴
     
-    if beam_properties["type"] == "rectangular":
-        print(f"\nVigas ({beam_properties['b']} x {beam_properties['h']} cm):")
+    # Mostrar configuración de vigas
+    if beam_config['type'] == 'uniform':
+        print(f"\nVigas (TODAS IGUALES):")
+        if beam_x_properties["type"] == "rectangular":
+            print(f"  Dimensiones: {beam_x_properties['b']*100:.0f} x {beam_x_properties['h']*100:.0f} cm")
+        else:
+            print(f"  Dimensiones: Ø {beam_x_properties['d']*100:.0f} cm")
+        print(f"  - Área: {beam_x_properties['A']*10000:.0f} cm²")
+        print(f"  - Iz: {beam_x_properties['Iz']*100000000:.0f} cm⁴")
+        print(f"  - Iy: {beam_x_properties['Iy']*100000000:.0f} cm⁴")
+        print(f"  - J: {beam_x_properties['J']*100000000:.0f} cm⁴")
     else:
-        print(f"\nVigas (Ø {beam_properties['d']} cm):")
-    print(f"  - Área: {beam_properties['A']:.2f} cm²")
-    print(f"  - Iz: {beam_properties['Iz']:.2f} cm⁴")
-    print(f"  - Iy: {beam_properties['Iy']:.2f} cm⁴")
-    print(f"  - J: {beam_properties['J']:.2f} cm⁴")
+        print(f"\nVigas X (dirección X):")
+        if beam_x_properties["type"] == "rectangular":
+            print(f"  Dimensiones: {beam_x_properties['b']*100:.0f} x {beam_x_properties['h']*100:.0f} cm")
+        else:
+            print(f"  Dimensiones: Ø {beam_x_properties['d']*100:.0f} cm")
+        print(f"  - Área: {beam_x_properties['A']*10000:.0f} cm²")
+        print(f"  - Iz: {beam_x_properties['Iz']*100000000:.0f} cm⁴")
+        print(f"  - Iy: {beam_x_properties['Iy']*100000000:.0f} cm⁴")
+        print(f"  - J: {beam_x_properties['J']*100000000:.0f} cm⁴")
+        
+        print(f"\nVigas Y (dirección Y):")
+        if beam_y_properties["type"] == "rectangular":
+            print(f"  Dimensiones: {beam_y_properties['b']*100:.0f} x {beam_y_properties['h']*100:.0f} cm")
+        else:
+            print(f"  Dimensiones: Ø {beam_y_properties['d']*100:.0f} cm")
+        print(f"  - Área: {beam_y_properties['A']*10000:.0f} cm²")
+        print(f"  - Iz: {beam_y_properties['Iz']*100000000:.0f} cm⁴")
+        print(f"  - Iy: {beam_y_properties['Iy']*100000000:.0f} cm⁴")
+        print(f"  - J: {beam_y_properties['J']*100000000:.0f} cm⁴")
     
-    print(f"\nLosas (Espesor: {slab_dimensions['thickness']} cm)")
+    print(f"\nLosas (Espesor: {slab_dimensions['thickness']*100:.0f} cm)")
     print("=" * 60)
     
     # Compilar diccionario de retorno
@@ -357,12 +534,29 @@ def define_sections(interactive=True, material_choice=None, skip_columns=False):
         "J_col": col_properties["J"],
         "col_type": col_properties["type"],
         
-        # Propiedades de vigas
-        "A_viga": beam_properties["A"],
-        "Iz_viga": beam_properties["Iz"],
-        "Iy_viga": beam_properties["Iy"],
-        "J_viga": beam_properties["J"],
-        "beam_type": beam_properties["type"],
+        # Propiedades de vigas X
+        "A_viga_x": beam_x_properties["A"],
+        "Iz_viga_x": beam_x_properties["Iz"],
+        "Iy_viga_x": beam_x_properties["Iy"],
+        "J_viga_x": beam_x_properties["J"],
+        "beam_x_type": beam_x_properties["type"],
+        
+        # Propiedades de vigas Y
+        "A_viga_y": beam_y_properties["A"],
+        "Iz_viga_y": beam_y_properties["Iz"],
+        "Iy_viga_y": beam_y_properties["Iy"],
+        "J_viga_y": beam_y_properties["J"],
+        "beam_y_type": beam_y_properties["type"],
+        
+        # Configuración de vigas
+        "beam_config_type": beam_config['type'],
+        
+        # Propiedades heredadas (para compatibilidad)
+        "A_viga": beam_x_properties["A"],  # Por defecto usa vigas X
+        "Iz_viga": beam_x_properties["Iz"],
+        "Iy_viga": beam_x_properties["Iy"],
+        "J_viga": beam_x_properties["J"],
+        "beam_type": beam_x_properties["type"],
         
         # Dimensiones de losas
         "slab_thickness": slab_dimensions["thickness"],
@@ -379,14 +573,37 @@ def define_sections(interactive=True, material_choice=None, skip_columns=False):
             "d_col": col_properties["d"]
         })
     
-    if beam_properties["type"] == "rectangular":
+    # Dimensiones de vigas X
+    if beam_x_properties["type"] == "rectangular":
         result.update({
-            "b_viga": beam_properties["b"],
-            "h_viga": beam_properties["h"]
+            "b_viga_x": beam_x_properties["b"],
+            "h_viga_x": beam_x_properties["h"]
         })
     else:
         result.update({
-            "d_viga": beam_properties["d"]
+            "d_viga_x": beam_x_properties["d"]
+        })
+    
+    # Dimensiones de vigas Y
+    if beam_y_properties["type"] == "rectangular":
+        result.update({
+            "b_viga_y": beam_y_properties["b"],
+            "h_viga_y": beam_y_properties["h"]
+        })
+    else:
+        result.update({
+            "d_viga_y": beam_y_properties["d"]
+        })
+    
+    # Dimensiones heredadas (para compatibilidad)
+    if beam_x_properties["type"] == "rectangular":
+        result.update({
+            "b_viga": beam_x_properties["b"],
+            "h_viga": beam_x_properties["h"]
+        })
+    else:
+        result.update({
+            "d_viga": beam_x_properties["d"]
         })
     
     return result

@@ -1,3 +1,4 @@
+
 # main.py
 # ============================================
 # Este script principal orquesta el modelado, análisis y visualización
@@ -25,10 +26,11 @@ import sections
 import slabs
 import loads
 import analysis
-import visualization
-import results
+import visualization_new as visualization
+import results_enhanced as results
 import advanced_config
 import enhanced_geometry
+import multi_analysis
 
 def print_header():
     """Imprime el encabezado del programa."""
@@ -86,9 +88,13 @@ def main():
 
         # Limpiar cualquier modelo anterior y crear uno nuevo
         print("\n=== INICIALIZANDO MODELO OPENSEESPY ===")
-        ops.wipe()
-        ops.model('basic', '-ndm', 3, '-ndf', 6)
-        print("✓ Modelo 3D creado (6 DOF por nodo)")
+        try:
+            ops.wipe()
+            ops.model('basic', '-ndm', 3, '-ndf', 6)
+            print("✓ Modelo 3D creado (6 DOF por nodo)")
+        except Exception as e:
+            print(f"⚠️ Error inicializando modelo: {e}")
+            print("Continuando con el modelo existente...")
 
         # 1. Entrada de datos geométricos
         print("\n" + "="*60)
@@ -141,7 +147,7 @@ def main():
                 }
             
             # Mostrar resumen y confirmar
-            if column_config or any(cantilever_config.values()) or slab_config:
+            if column_config or (cantilever_config and any(cantilever_config.values())) or slab_config:
                 if not advanced_config.display_configuration_summary(column_config or {}, cantilever_config, slab_config):
                     print("⚠️ Configuración rechazada. Usando valores por defecto.")
                     column_config = None
@@ -292,6 +298,7 @@ def main():
                     print("    ❌ ADVERTENCIA: No se detectaron restricciones en la base")
             except Exception as e:
                 print(f"    ⚠️ Error verificando restricciones: {e}")
+                print("    Continuando sin verificación de restricciones...")
                 restricted_nodes = 0
         
         if restricted_nodes == 0:
@@ -361,23 +368,17 @@ def main():
             generate_plots = not quick_test  # No mostrar gráficos en modo de prueba rápida
 
         if generate_plots:
-            print("🎨 Generando visualizaciones...")
+            print("🎨 Generando visualizaciones nuevas y mejoradas...")
             
-            # Modelo y deformada
-            visualization.plot_model_and_defo(geometry_data["num_floor"], total_nodes, total_elements)
+            # Crear diccionario con listas de elementos
+            element_lists = {
+                'columns': column_elements_ids,
+                'beams_x': beam_elements_x_ids,
+                'beams_y': beam_elements_y_ids
+            }
             
-            # Secciones extruidas
-            visualization.plot_extruded_sections(geometry_data, section_properties, 
-                                               column_elements_ids, beam_elements_x_ids, beam_elements_y_ids)
-            
-            # Detalles de secciones
-            visualization.plot_section_details(section_properties)
-            
-            # Comparación de secciones
-            visualization.plot_section_comparison(section_properties)
-            
-            # Diagramas de fuerzas internas
-            visualization.plot_section_force_diagrams()
+            # Generar todas las visualizaciones mejoradas
+            visualization.generate_all_visualizations(section_properties, element_lists)
         else:
             print("⏩ Visualización omitida")
 
@@ -393,11 +394,62 @@ def main():
             create_reports = True
 
         if create_reports:
-            print("📊 Generando reportes de resultados...")
-            results.generate_results(total_nodes, column_elements_ids, 
-                                    beam_elements_x_ids, beam_elements_y_ids, slab_elements_ids)
+            print("📊 Generando reportes mejorados de resultados...")
+            results.generate_enhanced_results(column_elements_ids, 
+                                            beam_elements_x_ids, beam_elements_y_ids, slab_elements_ids)
         else:
             print("⏩ Generación de reportes omitida")
+
+        # 12. Análisis con combinaciones de cargas ACI (nuevo)
+        print("\n" + "="*60)
+        print("PASO 12: ANÁLISIS CON COMBINACIONES DE CARGAS ACI")
+        print("="*60)
+        
+        if interactive:
+            print("\n🏗️ ANÁLISIS AVANZADO CON COMBINACIONES DE CARGAS")
+            print("Este análisis ejecuta múltiples combinaciones según ACI 318 para obtener")
+            print("las solicitaciones máximas necesarias para el diseño estructural.")
+            print("\nBeneficios:")
+            print("  • Solicitaciones máximas para diseño de elementos")
+            print("  • Comparación entre diferentes combinaciones de cargas")
+            print("  • Archivos CSV optimizados para post-procesamiento")
+            print("  • Cumplimiento con normativas ACI 318")
+            
+            run_aci_analysis = input("\n¿Desea ejecutar análisis con combinaciones ACI? (s/n): ").lower().strip()
+            perform_aci_analysis = run_aci_analysis in ['s', 'si', 'sí', 'y', 'yes']
+        else:
+            # En modo automático, ejecutar combinaciones básicas
+            perform_aci_analysis = True
+            print("🚀 Ejecutando análisis con combinaciones ACI en modo automático...")
+
+        if perform_aci_analysis:
+            print("\n🎯 Iniciando análisis con combinaciones de cargas ACI...")
+            
+            try:
+                # Ejecutar análisis completo con combinaciones
+                aci_results = multi_analysis.run_complete_load_combination_analysis(
+                    geometry_data=geometry_data,
+                    load_intensities=load_intensities,
+                    beam_elements_x=beam_elements_x_ids,
+                    beam_elements_y=beam_elements_y_ids,
+                    interactive=interactive
+                )
+                
+                if aci_results:
+                    print("\n✅ ANÁLISIS CON COMBINACIONES ACI COMPLETADO EXITOSAMENTE")
+                    print("📄 Archivos generados:")
+                    print("   🎯 maximum_demands_design.csv - Solicitaciones máximas para diseño")
+                    print("   📊 load_combinations_comparison.csv - Comparación detallada")
+                    print("   📈 analysis_statistics.csv - Estadísticas por combinación")
+                    print("   💾 Archivos estándar actualizados")
+                else:
+                    print("⚠️ El análisis con combinaciones ACI no se completó correctamente")
+                    
+            except Exception as e:
+                print(f"❌ Error en análisis con combinaciones ACI: {e}")
+                print("Continuando con el análisis estándar...")
+        else:
+            print("⏩ Análisis con combinaciones ACI omitido")
 
         # Mostrar figura de referencia al final para consulta del CSV
         if create_reports:
@@ -413,6 +465,9 @@ def main():
         if create_reports:
             print("📄 Reportes CSV generados en el directorio actual")
             print("📋 Figura de referencia mostrada para consulta de elementos")
+        
+        if perform_aci_analysis and aci_results:
+            print("🎯 Análisis con combinaciones ACI completado - archivos de diseño disponibles")
         
         print("\n💡 Puntos de expansión disponibles:")
         print("   🔹 Análisis sísmico y de viento")

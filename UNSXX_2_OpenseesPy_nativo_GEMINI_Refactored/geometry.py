@@ -31,55 +31,74 @@ def get_node_tag_from_indices(floor_idx, bay_y_idx, bay_x_idx, num_bay_x, num_ba
 def create_nodes(geometry_data, E, massX, M, massType):
     """
     Crea los nodos del modelo OpenSeesPy basándose en los datos de geometría.
+    
+    Esta función genera todos los nodos de la estructura en un patrón 3D regular,
+    desde la base (nivel 0) hasta el último nivel, incluyendo las masas
+    correspondientes y las restricciones en la base.
 
     Args:
         geometry_data (dict): Diccionario con los datos de geometría del edificio.
-        E (float): Módulo de elasticidad del material.
-        massX (float): Masa en dirección X para los nodos.
-        M (float): Masa adicional para elementos.
-        massType (str): Tipo de masa para los elementos.
+        E (float): Módulo de elasticidad del material (no usado aquí, para compatibilidad).
+        massX (float): Masa en dirección X para los nodos (toneladas).
+        M (float): Masa adicional para elementos (no usado aquí, para compatibilidad).
+        massType (str): Tipo de masa para los elementos (no usado aquí, para compatibilidad).
 
     Returns:
-        int: El número total de nodos creados.
+        int: El número total de nodos creados en la estructura.
     """
-    num_bay_x = geometry_data["num_bay_x"]
-    num_bay_y = geometry_data["num_bay_y"]
-    num_floor = geometry_data["num_floor"]
-    bay_widths_x = geometry_data["bay_widths_x"]
-    bay_widths_y = geometry_data["bay_widths_y"]
-    story_heights = geometry_data["story_heights"]
+    # Extraer datos de geometría del diccionario de entrada
+    num_bay_x = geometry_data["num_bay_x"]          # Número de vanos en dirección X
+    num_bay_y = geometry_data["num_bay_y"]          # Número de vanos en dirección Y  
+    num_floor = geometry_data["num_floor"]          # Número de pisos del edificio
+    bay_widths_x = geometry_data["bay_widths_x"]    # Lista con anchos de vanos en X (metros)
+    bay_widths_y = geometry_data["bay_widths_y"]    # Lista con anchos de vanos en Y (metros)
+    story_heights = geometry_data["story_heights"]  # Lista con alturas de pisos (metros)
 
     print("\n=== GENERACIÓN DE NODOS ===\n")
 
-    node_tag = 1
-    total_nodos = 0
+    node_tag = 1        # Contador de tags de nodos (empieza en 1)
+    total_nodos = 0     # Contador del total de nodos creados
 
-    for k in range(num_floor + 1):  # Para cada nivel (incluyendo base)
-        z_loc = 0
+    # Generar nodos para cada nivel del edificio (incluyendo la base)
+    for k in range(num_floor + 1):  # k = nivel (0=base, 1=primer piso, etc.)
+        z_loc = 0       # Coordenada Z del nivel actual
+        
+        # Calcular altura acumulada hasta el nivel actual
         if k > 0:
             for piso in range(k):
-                z_loc += story_heights[piso]
+                z_loc += story_heights[piso]    # Sumar alturas de pisos anteriores
 
-        for j in range(num_bay_y + 1):
-            y_loc = 0
+        # Generar nodos en cada fila Y del nivel actual
+        for j in range(num_bay_y + 1):      # j = posición en Y (0 a num_bay_y)
+            y_loc = 0   # Coordenada Y de la fila actual
+            
+            # Calcular distancia acumulada en Y hasta la posición actual
             if j > 0:
                 for vano in range(j):
-                    y_loc += bay_widths_y[vano]
+                    y_loc += bay_widths_y[vano]    # Sumar anchos de vanos anteriores en Y
 
-            for i in range(num_bay_x + 1):
-                x_loc = 0
+            # Generar nodos en cada columna X de la fila actual
+            for i in range(num_bay_x + 1):  # i = posición en X (0 a num_bay_x)
+                x_loc = 0   # Coordenada X de la columna actual
+                
+                # Calcular distancia acumulada en X hasta la posición actual
                 if i > 0:
                     for vano in range(i):
-                        x_loc += bay_widths_x[vano]
+                        x_loc += bay_widths_x[vano]    # Sumar anchos de vanos anteriores en X
 
+                # Crear el nodo con las coordenadas calculadas
                 ops.node(node_tag, x_loc, y_loc, z_loc)
+                
+                # Asignar masa al nodo (para análisis dinámico)
+                # massX en X e Y, masa pequeña en Z, momentos de inercia pequeños
                 ops.mass(node_tag, massX, massX, 0.01, 1.0e-10, 1.0e-10, 1e-10)
 
-                if k == 0:  # Si es el nivel base (k=0)
-                    ops.fix(node_tag, 1, 1, 1, 1, 1, 1)
+                # Si estamos en la base (k=0), aplicar restricciones de empotramiento
+                if k == 0:  
+                    ops.fix(node_tag, 1, 1, 1, 1, 1, 1)    # Restringir todos los 6 grados de libertad
 
-                node_tag += 1
-                total_nodos += 1
+                node_tag += 1       # Incrementar tag para el siguiente nodo
+                total_nodos += 1    # Incrementar contador total
 
     print(f"Total de nodos creados: {total_nodos}")
 
@@ -163,6 +182,7 @@ def create_columns(geometry_data, E, M, massType, A_col, Iz_col, Iy_col, J_col):
 def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga, start_ele_tag, total_nodes):
     """
     Crea los elementos viga del modelo OpenSeesPy.
+    SOLO genera vigas ortogonales en el mismo nivel.
 
     Args:
         geometry_data (dict): Diccionario con los datos de geometría del edificio.
@@ -192,7 +212,7 @@ def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga
 
     ops.geomTransf("Linear", 2, 0, 0, 1)  # Transformación para vigas (eje Z)
 
-    print("\n=== GENERACIÓN DE VIGAS DIRECCIÓN X ===\n")
+    print("\n=== GENERACIÓN DE VIGAS DIRECCIÓN X (ORTOGONALES) ===\n")
     for k in range(1, num_floor + 1):
         nodo_inicial_nivel = 1 + k * nodos_por_nivel
         for j in range(num_bay_y + 1):
@@ -203,7 +223,8 @@ def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga
                 if node_tag1 <= total_nodes and node_tag2 <= total_nodes:
                     coord1 = ops.nodeCoord(node_tag1)
                     coord2 = ops.nodeCoord(node_tag2)
-                    if abs(coord1[1] - coord2[1]) < 0.001:
+                    # Verificar que los nodos están en la misma línea Y y Z (ortogonal)
+                    if abs(coord1[1] - coord2[1]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
                         ops.element(
                             'elasticBeamColumn', ele_tag,
                             node_tag1, node_tag2,
@@ -214,12 +235,12 @@ def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga
                         ele_tag += 1
                         total_vigas_x += 1
                     else:
-                        print(f"      ERROR: Nodos {node_tag1} y {node_tag2} no están en la misma fila Y")
+                        print(f"      ⚠️ Saltando viga diagonal: nodos {node_tag1} y {node_tag2} no están en la misma línea Y")
                 else:
                     print(f"      ERROR: Nodos {node_tag1} o {node_tag2} no existen (total: {total_nodes})")
     print(f"Total de vigas en dirección X creadas: {total_vigas_x}")
 
-    print("\n=== GENERACIÓN DE VIGAS DIRECCIÓN Y ===\n")
+    print("\n=== GENERACIÓN DE VIGAS DIRECCIÓN Y (ORTOGONALES) ===\n")
     for k in range(1, num_floor + 1):
         nodo_inicial_nivel = 1 + k * nodos_por_nivel
         for i in range(num_bay_x + 1):
@@ -229,7 +250,8 @@ def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga
                 if node_tag1 <= total_nodes and node_tag2 <= total_nodes:
                     coord1 = ops.nodeCoord(node_tag1)
                     coord2 = ops.nodeCoord(node_tag2)
-                    if abs(coord1[0] - coord2[0]) < 0.001:
+                    # Verificar que los nodos están en la misma línea X y Z (ortogonal)
+                    if abs(coord1[0] - coord2[0]) < 0.001 and abs(coord1[2] - coord2[2]) < 0.001:
                         ops.element(
                             'elasticBeamColumn', ele_tag,
                             node_tag1, node_tag2,
@@ -240,9 +262,10 @@ def create_beams(geometry_data, E, M, massType, A_viga, Iz_viga, Iy_viga, J_viga
                         ele_tag += 1
                         total_vigas_y += 1
                     else:
-                        print(f"      ERROR: Nodos {node_tag1} y {node_tag2} no están en la misma columna X")
+                        print(f"      ⚠️ Saltando viga diagonal: nodos {node_tag1} y {node_tag2} no están en la misma línea X")
                 else:
                     print(f"      ERROR: Nodos {node_tag1} o {node_tag2} no existen (total: {total_nodes})")
     print(f"Total de vigas en dirección Y creadas: {total_vigas_y}")
+    print(f"✅ TODAS las vigas son ortogonales y están en el mismo nivel")
 
     return total_vigas_x, beam_elements_x_ids, total_vigas_y, beam_elements_y_ids, ele_tag

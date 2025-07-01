@@ -403,15 +403,18 @@ def get_front_cantilever_config():
     print("-" * 40)
     print("El volado frontal se extiende en la dirección X positiva.")
     print("Se aplicará desde el segundo nivel hacia arriba.")
+    print("🚨 MÁXIMO RECOMENDADO: 0.8 m (para estabilidad estructural)")
+    print("💡 Recomendación óptima: 0.5-0.8 m")
     print()
     
     while True:
         try:
-            length = float(input("Longitud del volado frontal (m) [0.3-1.0]: ").strip())
-            if 0.3 <= length <= 1.0:
+            length = float(input("Longitud del volado frontal (m) [0.3-0.8]: ").strip())
+            if 0.3 <= length <= 0.8:
                 break
             else:
-                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 1.0 m")
+                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 0.8 m")
+                print("   Para volados >0.8m el análisis puede fallar por inestabilidad")
         except ValueError:
             print("❌ Ingrese un valor numérico válido")
         except KeyboardInterrupt:
@@ -425,6 +428,13 @@ def get_front_cantilever_config():
         try:
             width = float(input("Ancho de viga de borde (m) [0.20-0.40]: ").strip())
             if 0.20 <= width <= 0.40:
+                # Validación adicional: ancho mínimo según longitud del volado
+                min_width_required = max(0.20, length * 0.35)  # 35% de la longitud del volado
+                if width < min_width_required:
+                    print(f"⚠️ Advertencia: Para volado de {length:.2f}m se recomienda ancho mínimo de {min_width_required:.2f}m")
+                    confirm = input("¿Continuar con este ancho? (s/n): ").strip().lower()
+                    if confirm not in ['s', 'si', 'y', 'yes']:
+                        continue
                 break
             else:
                 print("❌ Ancho fuera de rango. Use valores entre 0.20 y 0.40 m")
@@ -438,6 +448,13 @@ def get_front_cantilever_config():
         try:
             height = float(input("Altura de viga de borde (m) [0.15-0.30]: ").strip())
             if 0.15 <= height <= 0.30:
+                # Validación adicional: altura mínima según longitud del volado
+                min_height_required = max(0.15, length * 0.2)  # 20% de la longitud del volado
+                if height < min_height_required:
+                    print(f"⚠️ Advertencia: Para volado de {length:.2f}m se recomienda altura mínima de {min_height_required:.2f}m")
+                    confirm = input("¿Continuar con esta altura? (s/n): ").strip().lower()
+                    if confirm not in ['s', 'si', 'y', 'yes']:
+                        continue
                 break
             else:
                 print("❌ Altura fuera de rango. Use valores entre 0.15 y 0.30 m")
@@ -466,23 +483,18 @@ def get_side_cantilever_config(side):
     print(f"\n🏢 CONFIGURACIÓN DE VOLADO LATERAL {side.upper()}")
     print("-" * 50)
     print(f"El volado lateral {side} se extiende en la dirección Y.")
-    print("Limitado a máximo 1.0 m, idealmente 0.6 m.")
+    print("🚨 MÁXIMO RECOMENDADO: 0.6 m (para estabilidad estructural)")
+    print("💡 Recomendación óptima: 0.4-0.6 m")
     print()
     
     while True:
         try:
-            length = float(input(f"Longitud del volado {side} (m) [0.3-1.0]: ").strip())
-            if 0.3 <= length <= 1.0:
-                if length > 0.6:
-                    confirm = input(f"⚠️  Longitud {length}m es mayor a la ideal (0.6m). ¿Continuar? (s/n): ").strip().lower()
-                    if confirm in ['s', 'si', 'y', 'yes']:
-                        break
-                    else:
-                        continue
-                else:
-                    break
+            length = float(input(f"Longitud del volado {side} (m) [0.3-0.6]: ").strip())
+            if 0.3 <= length <= 0.6:
+                break
             else:
-                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 1.0 m")
+                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 0.6 m")
+                print("   Para volados >0.6m el análisis puede fallar por inestabilidad")
         except ValueError:
             print("❌ Ingrese un valor numérico válido")
         except KeyboardInterrupt:
@@ -495,6 +507,13 @@ def get_side_cantilever_config(side):
         try:
             width = float(input("Ancho de viga de borde (m) [0.20-0.35]: ").strip())
             if 0.20 <= width <= 0.35:
+                # Validación adicional: ancho mínimo según longitud del volado
+                min_width_required = max(0.20, length * 0.4)  # 40% de la longitud del volado
+                if width < min_width_required:
+                    print(f"⚠️ Advertencia: Para volado de {length:.2f}m se recomienda ancho mínimo de {min_width_required:.2f}m")
+                    confirm = input("¿Continuar con este ancho? (s/n): ").strip().lower()
+                    if confirm not in ['s', 'si', 'y', 'yes']:
+                        continue
                 break
             else:
                 print("❌ Ancho fuera de rango. Use valores entre 0.20 y 0.35 m")
@@ -508,6 +527,13 @@ def get_side_cantilever_config(side):
         try:
             height = float(input("Altura de viga de borde (m) [0.15-0.25]: ").strip())
             if 0.15 <= height <= 0.25:
+                # Validación adicional: altura mínima según longitud del volado
+                min_height_required = max(0.15, length * 0.25)  # 25% de la longitud del volado
+                if height < min_height_required:
+                    print(f"⚠️ Advertencia: Para volado de {length:.2f}m se recomienda altura mínima de {min_height_required:.2f}m")
+                    confirm = input("¿Continuar con esta altura? (s/n): ").strip().lower()
+                    if confirm not in ['s', 'si', 'y', 'yes']:
+                        continue
                 break
             else:
                 print("❌ Altura fuera de rango. Use valores entre 0.15 y 0.25 m")

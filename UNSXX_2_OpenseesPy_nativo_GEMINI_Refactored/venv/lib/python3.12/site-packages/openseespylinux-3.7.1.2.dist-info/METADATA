@@ -1,0 +1,54 @@
+Metadata-Version: 2.2
+Name: openseespylinux
+Version: 3.7.1.2
+Summary: A OpenSeesPy Linux package
+Home-page: https://github.com/zhuminjie/openseespy
+Author: Minjie Zhu
+Author-email: zhum@oregonstate.edu
+License: LICENSE.md
+Platform: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: POSIX :: Linux
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: platform
+Dynamic: requires-python
+Dynamic: summary
+
+# OpenSeesPy Linux
+
+Pip Package for OpenSeesPy Linux
+
+## Installation
+
+```bash
+pip install openseespylinux
+```
+
+## Import
+
+```python
+import openseespylinux as ops
+```
+
+## Documentation
+
+[OpenSeesPy Documentation](https://openseespydoc.readthedocs.io/en/latest/index.html)
+
+[OpenSeesPy Source Code](github.com/OpenSees/OpenSees)
+
+## Issues
+
+Any issues for installation and running the pip package, please
+report to
+[OpenSeesPy Github Page](https://github.com/zhuminjie/OpenSeesPy).
+
+Any issues and bugs in `OpenSees` should be
+reported on the [OpenSees GitHub Page](https://github.com/OpenSees/OpenSees).

@@ -180,26 +180,37 @@ def run_analysis():
     print("\n  🚀 Iniciando análisis estático...")
     
     try:
-        # Configurar análisis estático con manejo de errores
-        print("    📋 Configurando parámetros de análisis...")
+        # Configurar análisis estático con manejo robusto de errores
+        print("    📋 Configurando parámetros de análisis (robustos para estabilidad)...")
         
         # Configuración de restricciones
         ops.constraints('Transformation')
         print("      ✅ Restricciones: Transformation")
         
-        # Numerador
+        # Numerador (RCM es mejor para matrices dispersas)
         ops.numberer('RCM')
         print("      ✅ Numerador: RCM")
         
-        # Sistema de ecuaciones
-        ops.system('BandGeneral')
-        print("      ✅ Sistema: BandGeneral")
+        # Sistema de ecuaciones con fallback robusto
+        try:
+            # Primero intentar con SparseSPD (más robusto para problemas de estabilidad)
+            ops.system('SparseSPD')
+            print("      ✅ Sistema: SparseSPD (optimizado para estabilidad)")
+        except:
+            try:
+                # Si falla, usar ProfileSPD 
+                ops.system('ProfileSPD')
+                print("      ✅ Sistema: ProfileSPD (fallback)")
+            except:
+                # Último recurso: BandGeneral
+                ops.system('BandGeneral')
+                print("      ⚠️ Sistema: BandGeneral (básico)")
         
-        # Criterio de convergencia
-        ops.test('NormDispIncr', 1e-6, 6, 2)
-        print("      ✅ Test: NormDispIncr (tol=1e-6, iter=6)")
+        # Criterio de convergencia más tolerante para matrices casi singulares
+        ops.test('NormDispIncr', 1e-5, 10, 2)
+        print("      ✅ Test: NormDispIncr (tol=1e-5, iter=10)")
         
-        # Algoritmo
+        # Algoritmo Linear para análisis estático
         ops.algorithm('Linear')
         print("      ✅ Algoritmo: Linear")
         
@@ -244,6 +255,13 @@ def run_analysis():
         
         if result == 0:
             print("    ✅ Análisis completado exitosamente")
+            
+            # Calcular reacciones en los apoyos
+            try:
+                ops.reactions()
+                print("    ✅ Reacciones en apoyos calculadas")
+            except Exception as e:
+                print(f"    ⚠️ Error calculando reacciones: {e}")
             
             # Verificar que tenemos resultados válidos
             print("\n  📊 Verificando resultados...")

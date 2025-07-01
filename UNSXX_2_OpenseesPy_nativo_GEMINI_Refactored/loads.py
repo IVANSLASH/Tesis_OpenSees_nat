@@ -193,7 +193,7 @@ def calculate_tributary_area(geometry_data, bay_i, bay_j):
     
     return width_x * width_y
 
-def apply_dead_loads(geometry_data, load_intensities, pattern_tag=1):
+def apply_dead_loads(geometry_data, load_intensities, pattern_tag=1, load_factor=1.0):
     """
     Aplica cargas muertas al modelo.
     
@@ -201,14 +201,15 @@ def apply_dead_loads(geometry_data, load_intensities, pattern_tag=1):
         geometry_data (dict): Datos de geometría del edificio
         load_intensities (dict): Intensidades de carga
         pattern_tag (int): Tag del patrón de carga
+        load_factor (float): Factor de amplificación de carga
     """
-    print(f"\n  Aplicando cargas muertas (Patrón {pattern_tag})...")
+    print(f"\n  Aplicando cargas muertas (Patrón {pattern_tag}, Factor: {load_factor})...")
     
     num_bay_x = geometry_data["num_bay_x"]
     num_bay_y = geometry_data["num_bay_y"]
     num_floor = geometry_data["num_floor"]
     
-    dead_load_slab = load_intensities["dead_load_slab"]
+    dead_load_slab = load_intensities["dead_load_slab"] * load_factor
     
     # Aplicar cargas muertas de losa a nodos
     loads_applied = 0
@@ -231,7 +232,7 @@ def apply_dead_loads(geometry_data, load_intensities, pattern_tag=1):
     print(f"    Cargas muertas aplicadas a {loads_applied} nodos")
     print(f"    Intensidad: {dead_load_slab} kN/m²")
 
-def apply_live_loads(geometry_data, load_intensities, pattern_tag=2):
+def apply_live_loads(geometry_data, load_intensities, pattern_tag=2, load_factor=1.0):
     """
     Aplica cargas vivas al modelo.
     
@@ -239,14 +240,15 @@ def apply_live_loads(geometry_data, load_intensities, pattern_tag=2):
         geometry_data (dict): Datos de geometría del edificio
         load_intensities (dict): Intensidades de carga
         pattern_tag (int): Tag del patrón de carga
+        load_factor (float): Factor de amplificación de carga
     """
-    print(f"\n  Aplicando cargas vivas (Patrón {pattern_tag})...")
+    print(f"\n  Aplicando cargas vivas (Patrón {pattern_tag}, Factor: {load_factor})...")
     
     num_bay_x = geometry_data["num_bay_x"]
     num_bay_y = geometry_data["num_bay_y"]
     num_floor = geometry_data["num_floor"]
     
-    live_load_slab = load_intensities["live_load_slab"]
+    live_load_slab = load_intensities["live_load_slab"] * load_factor
     
     # Aplicar cargas vivas de losa a nodos
     loads_applied = 0
@@ -269,7 +271,7 @@ def apply_live_loads(geometry_data, load_intensities, pattern_tag=2):
     print(f"    Cargas vivas aplicadas a {loads_applied} nodos")
     print(f"    Intensidad: {live_load_slab} kN/m²")
 
-def apply_beam_loads(geometry_data, load_intensities, beam_elements_x, beam_elements_y, load_type="dead"):
+def apply_beam_loads(geometry_data, load_intensities, beam_elements_x, beam_elements_y, load_type="dead", load_factor=1.0):
     """
     Aplica cargas distribuidas a vigas.
     
@@ -279,11 +281,12 @@ def apply_beam_loads(geometry_data, load_intensities, beam_elements_x, beam_elem
         beam_elements_x (list): Lista de elementos viga en X
         beam_elements_y (list): Lista de elementos viga en Y
         load_type (str): Tipo de carga ('dead' o 'live')
+        load_factor (float): Factor de amplificación de carga
     """
     if load_type == "dead":
-        load_intensity = load_intensities["dead_load_beam"]
+        load_intensity = load_intensities["dead_load_beam"] * load_factor
     else:
-        load_intensity = load_intensities["live_load_beam"]
+        load_intensity = load_intensities["live_load_beam"] * load_factor
     
     print(f"    Aplicando cargas {load_type} distribuidas en vigas: {load_intensity} kN/m")
     
@@ -338,6 +341,40 @@ def apply_point_load_test(geometry_data, load_intensities, pattern_tag=3):
     print(f"    Carga: {test_load} kN en dirección X")
     
     ops.load(test_node, test_load, 0, 0, 0, 0, 0)
+
+def apply_load_combination_factors(geometry_data, load_intensities, beam_elements_x, beam_elements_y, 
+                                  dead_factor=1.0, live_factor=1.0, combination_name="Custom"):
+    """
+    Aplica cargas con factores específicos para una combinación de cargas.
+    
+    Args:
+        geometry_data (dict): Datos de geometría del edificio
+        load_intensities (dict): Intensidades de carga base
+        beam_elements_x (list): Lista de elementos viga en X
+        beam_elements_y (list): Lista de elementos viga en Y
+        dead_factor (float): Factor para cargas muertas
+        live_factor (float): Factor para cargas vivas
+        combination_name (str): Nombre de la combinación
+    """
+    print(f"\n=== APLICANDO COMBINACIÓN: {combination_name} ===")
+    print(f"Factores: D={dead_factor}, L={live_factor}")
+    
+    # Configurar series de tiempo y patrones de carga
+    ops.timeSeries('Linear', 1)
+    
+    # Aplicar cargas muertas con factor
+    if dead_factor > 0:
+        ops.pattern('Plain', 1, 1)
+        apply_dead_loads(geometry_data, load_intensities, 1, dead_factor)
+        apply_beam_loads(geometry_data, load_intensities, beam_elements_x, beam_elements_y, "dead", dead_factor)
+    
+    # Aplicar cargas vivas con factor
+    if live_factor > 0:
+        ops.pattern('Plain', 2, 1)
+        apply_live_loads(geometry_data, load_intensities, 2, live_factor)
+        apply_beam_loads(geometry_data, load_intensities, beam_elements_x, beam_elements_y, "live", live_factor)
+    
+    print(f"✅ Combinación {combination_name} aplicada exitosamente")
 
 def create_load_combination(combination_name, combinations, time_series_tag=1):
     """
@@ -404,7 +441,11 @@ def apply_loads(geometry_data, load_intensities, beam_elements_x, beam_elements_
     
     # Patrón para carga puntual de prueba (opcional)
     if interactive:
-        add_test_load = input("\n¿Aplicar carga puntual de prueba? (s/n): ").lower().strip()
+        print("\n🔍 CARGA PUNTUAL DE PRUEBA:")
+        print("Esta carga es para verificar que el modelo responde correctamente.")
+        print("Se aplica una fuerza horizontal de 10 kN en el nodo central del último nivel.")
+        print("Propósito: Verificar deformaciones y comportamiento estructural.")
+        add_test_load = input("¿Aplicar carga puntual de prueba? (s/n): ").lower().strip()
         if add_test_load in ['s', 'si', 'sí', 'y', 'yes']:
             ops.pattern('Plain', 3, 1)
             apply_point_load_test(geometry_data, load_intensities, 3)
