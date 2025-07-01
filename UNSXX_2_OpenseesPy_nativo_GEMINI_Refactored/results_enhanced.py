@@ -26,6 +26,29 @@ def generate_detailed_element_csv(filename="detailed_elements.csv"):
             print("⚠️ No hay elementos para exportar")
             return None
         
+        print(f"📊 Procesando {len(element_tags)} elementos...")
+        
+        # Verificar que el análisis se haya ejecutado probando con el primer elemento
+        test_forces_available = False
+        for test_ele in element_tags[:3]:  # Probar con los primeros 3 elementos
+            try:
+                nodes = ops.eleNodes(test_ele)
+                if len(nodes) == 2:  # Solo elementos lineales
+                    test_forces = ops.eleForce(test_ele)
+                    if test_forces and len(test_forces) >= 12 and any(abs(f) > 1e-10 for f in test_forces):
+                        test_forces_available = True
+                        print(f"✅ Fuerzas detectadas en elemento {test_ele}")
+                        break
+            except:
+                continue
+        
+        if not test_forces_available:
+            print("⚠️ ADVERTENCIA: No se detectaron fuerzas válidas en los elementos")
+            print("   Esto puede indicar que el análisis no se completó correctamente")
+            print("   o que las fuerzas son muy pequeñas")
+        else:
+            print("✅ Sistema de fuerzas verificado - procediendo con extracción")
+        
         # Lista para almacenar datos
         element_data = []
         
@@ -70,11 +93,18 @@ def generate_detailed_element_csv(filename="detailed_elements.csv"):
                 # Obtener fuerzas del elemento (solo para elementos lineales)
                 try:
                     forces = ops.eleForce(ele_tag)
+                    if forces is None:
+                        print(f"    ⚠️ Elemento {ele_tag}: ops.eleForce() retornó None")
                 except Exception as e:
                     print(f"    ⚠️ Error obteniendo fuerzas del elemento {ele_tag}: {e}")
                     forces = None
                 
                 if forces and len(forces) >= 12:
+                    # Verificar si las fuerzas tienen valores significativos
+                    has_significant_forces = any(abs(f) > 1e-10 for f in forces)
+                    if has_significant_forces and ele_tag <= max(element_tags[:3]):  # Solo mostrar para los primeros elementos
+                        print(f"    ✅ Elemento {ele_tag}: Fuerzas extraídas correctamente")
+                    
                     # Fuerzas en nodo i (inicio)
                     Ni = forces[0]    # Axial
                     Vyi = forces[1]   # Cortante Y
@@ -158,9 +188,26 @@ def generate_detailed_element_csv(filename="detailed_elements.csv"):
             # Guardar CSV
             df.to_csv(filename, index=False, float_format='%.4f')
             
+            # Contar elementos con fuerzas válidas (no cero)
+            elements_with_forces = 0
+            for _, row in df.iterrows():
+                force_cols = ['N_I', 'Vy_I', 'Vz_I', 'T_I', 'My_I', 'Mz_I', 'N_J', 'Vy_J', 'Vz_J', 'T_J', 'My_J', 'Mz_J']
+                has_forces = any(abs(row[col]) > 1e-10 for col in force_cols if col in row)
+                if has_forces:
+                    elements_with_forces += 1
+            
             print(f"✅ Archivo CSV detallado guardado: {filename}")
             print(f"   📊 {len(element_data)} elementos exportados")
             print(f"   🏗️ Tipos: {df['Tipo'].value_counts().to_dict()}")
+            print(f"   ⚡ Elementos con fuerzas válidas: {elements_with_forces}/{len(element_data)}")
+            
+            if elements_with_forces == 0:
+                print("   ⚠️ NINGÚN ELEMENTO TIENE FUERZAS VÁLIDAS")
+                print("   💡 Esto indica que el análisis estructural no se completó correctamente")
+            elif elements_with_forces < len(element_data) * 0.5:
+                print("   ⚠️ Pocos elementos tienen fuerzas válidas - verificar análisis")
+            else:
+                print("   ✅ La mayoría de elementos tienen fuerzas válidas")
             
             return df
         else:

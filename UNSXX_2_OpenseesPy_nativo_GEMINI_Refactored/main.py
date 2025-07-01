@@ -355,6 +355,18 @@ def main():
             print("  • Revise que los volados no excedan los límites recomendados")
             print("  • Considere reducir la altura o número de pisos")
             return
+        
+        # IMPORTANTE: Generar reportes inmediatamente después del análisis exitoso
+        # para preservar los resultados antes de cualquier operación adicional
+        print("\n🚀 GENERANDO REPORTES DE ANÁLISIS PRINCIPAL (inmediatamente)...")
+        print("📊 Extrayendo resultados del análisis estructural...")
+        try:
+            results.generate_enhanced_results(column_elements_ids, 
+                                            beam_elements_x_ids, beam_elements_y_ids, slab_elements_ids)
+            print("✅ Reportes del análisis principal generados exitosamente")
+        except Exception as e:
+            print(f"⚠️ Error generando reportes inmediatos: {e}")
+            print("Los reportes se intentarán generar nuevamente más adelante")
 
         # 10. Visualización
         print("\n" + "="*60)
@@ -382,23 +394,30 @@ def main():
         else:
             print("⏩ Visualización omitida")
 
-        # 11. Generación de resultados
+        # 11. Generación de resultados (opcional si ya se generaron)
         print("\n" + "="*60)
-        print("PASO 11: GENERACIÓN DE REPORTES")
+        print("PASO 11: GENERACIÓN DE REPORTES ADICIONALES")
         print("="*60)
+        print("ℹ️ Los reportes del análisis principal ya fueron generados inmediatamente")
+        print("   después del análisis para preservar los resultados.")
         
         if interactive:
-            generate_reports = input("\n¿Desea generar reportes CSV de resultados? (s/n): ").lower().strip()
+            print("\n¿Desea regenerar los reportes CSV? (normalmente no es necesario)")
+            generate_reports = input("Regenerar reportes (s/n): ").lower().strip()
             create_reports = generate_reports in ['s', 'si', 'sí', 'y', 'yes']
         else:
-            create_reports = True
+            create_reports = False  # No regenerar en modo automático
 
         if create_reports:
-            print("📊 Generando reportes mejorados de resultados...")
-            results.generate_enhanced_results(column_elements_ids, 
-                                            beam_elements_x_ids, beam_elements_y_ids, slab_elements_ids)
+            print("📊 Regenerando reportes de resultados...")
+            try:
+                results.generate_enhanced_results(column_elements_ids, 
+                                                beam_elements_x_ids, beam_elements_y_ids, slab_elements_ids)
+                print("✅ Reportes regenerados exitosamente")
+            except Exception as e:
+                print(f"⚠️ Error regenerando reportes: {e}")
         else:
-            print("⏩ Generación de reportes omitida")
+            print("⏩ Regeneración de reportes omitida")
 
         # 12. Análisis con combinaciones de cargas ACI (nuevo)
         print("\n" + "="*60)

@@ -1,22 +1,22 @@
 ============================================================
 REPORTE RESUMEN DE ANÁLISIS ESTRUCTURAL
 ============================================================
-Fecha y hora: 2025-06-30 19:34:47
+Fecha y hora: 2025-06-30 20:43:25
 Sistema de unidades: Métrico (m, kN, s)
 
 INFORMACIÓN DEL MODELO:
 ------------------------------
-Total de nodos: 136
-Total de elementos: 320
-  - Columnas: 96
-  - Vigas X: 84
-  - Vigas Y: 140
+Total de nodos: 64
+Total de elementos: 147
+  - Columnas: 48
+  - Vigas X: 63
+  - Vigas Y: 36
 
 DIMENSIONES DE LA ESTRUCTURA:
 ------------------------------
-Ancho (X): 9.00 m
-Largo (Y): 22.60 m
-Altura (Z): 13.00 m
+Ancho (X): 16.00 m
+Largo (Y): 13.00 m
+Altura (Z): 9.00 m
 
 ARCHIVOS GENERADOS:
 ------------------------------
