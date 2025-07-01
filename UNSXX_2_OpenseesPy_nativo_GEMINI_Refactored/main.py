@@ -52,7 +52,7 @@ def get_execution_mode():
     print("\n=== MODO DE EJECUCIÓN ===")
     print("Seleccione el modo de ejecución:")
     print("1. Modo Interactivo Completo (personalizar todo)")
-    print("2. Modo Rápido de Prueba (valores por defecto)")
+    print("2. Modo Rápido de Prueba (valores por defecto + TODOS los diagramas)")
     print("3. Cargar configuración desde archivo")
     
     while True:
@@ -272,6 +272,13 @@ def main():
             )
             cantilever_beam_ids = []
         
+        # 6.4. Verificación de estabilidad de volados
+        if use_enhanced and any([cantilever_config['front'], cantilever_config['right'], cantilever_config['left']]):
+            stability_ok = enhanced_geometry.verify_cantilever_stability(cantilever_config)
+            if not stability_ok:
+                print("⚠️ Se detectaron problemas de estabilidad en los volados")
+                print("   El análisis continuará, pero revise las recomendaciones mostradas")
+        
         # 6.5. Verificación de condiciones de frontera
         print("\n" + "="*60)
         print("PASO 6.5: VERIFICACIÓN DE CONDICIONES DE FRONTERA")
@@ -377,10 +384,18 @@ def main():
             show_plots = input("\n¿Desea generar y mostrar gráficos? (s/n): ").lower().strip()
             generate_plots = show_plots in ['s', 'si', 'sí', 'y', 'yes']
         else:
-            generate_plots = not quick_test  # No mostrar gráficos en modo de prueba rápida
+            generate_plots = True  # Generar gráficos también en modo de prueba rápida
 
         if generate_plots:
-            print("🎨 Generando visualizaciones nuevas y mejoradas...")
+            if quick_test:
+                print("🎨 Generando visualizaciones completas en modo de prueba rápida...")
+                print("   📊 Se generarán TODOS los diagramas automáticamente:")
+                print("   • Estructura de referencia con etiquetas")
+                print("   • Estructura extruida con secciones reales")
+                print("   • Diagramas de fuerzas axiales, cortantes y momentos")
+                print("   • Estructura deformada con escala optimizada")
+            else:
+                print("🎨 Generando visualizaciones nuevas y mejoradas...")
             
             # Crear diccionario con listas de elementos
             element_lists = {

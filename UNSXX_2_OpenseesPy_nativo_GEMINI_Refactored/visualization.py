@@ -25,6 +25,121 @@ from mpl_toolkits.mplot3d.proj3d import proj_transform
 from matplotlib.patches import ConnectionPatch
 import matplotlib.colors as mcolors
 
+def plot_deformed_structure_optimized(scale_factor=None, title="Estructura Deformada con Escala Optimizada"):
+    """
+    Visualiza la estructura deformada con factor de escala automático optimizado.
+    
+    Args:
+        scale_factor (float, optional): Factor de escala manual. Si None, se calcula automáticamente.
+        title (str): Título del gráfico.
+    
+    Returns:
+        tuple: (figura_matplotlib, factor_escala_usado)
+    """
+    print(f"\n=== {title.upper()} ===")
+    
+    try:
+        # Obtener datos del modelo
+        node_tags = ops.getNodeTags()
+        if not node_tags:
+            print("⚠️ No hay nodos en el modelo")
+            return None, None
+        
+        # Calcular factor de escala automático si no se proporciona
+        if scale_factor is None:
+            max_displacement = 0.0
+            coords = []
+            
+            for tag in node_tags:
+                try:
+                    disp = ops.nodeDisp(tag)
+                    coord = ops.nodeCoord(tag)
+                    coords.append(coord)
+                    
+                    # Calcular desplazamiento total (magnitud del vector)
+                    total_disp = (disp[0]**2 + disp[1]**2 + disp[2]**2)**0.5
+                    max_displacement = max(max_displacement, total_disp)
+                except:
+                    continue
+            
+            # Calcular dimensión característica de la estructura
+            if coords:
+                coords = np.array(coords)
+                x_span = coords[:, 0].max() - coords[:, 0].min()
+                y_span = coords[:, 1].max() - coords[:, 1].min()
+                z_span = coords[:, 2].max() - coords[:, 2].min()
+                structure_dimension = max(x_span, y_span, z_span)
+                
+                # Factor de escala para que deformaciones sean 15% de la estructura
+                if max_displacement > 0:
+                    scale_factor = (structure_dimension * 0.15) / max_displacement
+                else:
+                    scale_factor = 100  # Valor por defecto
+            else:
+                scale_factor = 100
+            
+            print(f"  📊 Desplazamiento máximo: {max_displacement:.6f} m")
+            print(f"  📏 Dimensión de estructura: {structure_dimension:.2f} m")
+            print(f"  🎯 Factor de escala calculado: {scale_factor:.1f}")
+            print(f"  📐 Deformación visual: {max_displacement * scale_factor:.3f} m")
+        else:
+            print(f"  🎯 Factor de escala manual: {scale_factor:.1f}")
+        
+        # Crear figura
+        fig = plt.figure(figsize=(16, 12))
+        
+        # Generar visualización deformada
+        opsv.plot_defo(
+            sfac=scale_factor,
+            nep=17,
+            unDefoFlag=1,  # Mostrar estructura original también
+            fmt_defo={'color': 'red', 'linestyle': 'solid', 'linewidth': 2.5, 'marker': '', 'markersize': 1},
+            fmt_undefo={'color': 'lightblue', 'linestyle': '--', 'linewidth': 1.5, 'marker': '.', 'markersize': 1},
+            fmt_defo_faces={'alpha': 0.8, 'edgecolors': 'darkred', 'linewidths': 1.5},
+            fmt_undefo_faces={'alpha': 0.3, 'edgecolors': 'blue', 'facecolors': 'lightblue', 'linestyles': 'dotted', 'linewidths': 1},
+            interpFlag=1,
+            endDispFlag=0,
+            fmt_nodes={'color': 'black', 'linestyle': 'None', 'linewidth': 1.2, 'marker': 'o', 'markersize': 4},
+            Eo=0,
+            az_el=(-60.0, 30.0),
+            fig_wi_he=(16, 12),
+            fig_lbrt=(0.1, 0.1, 0.9, 0.9),
+            node_supports=True,
+            ax=False
+        )
+        
+        # Título informativo
+        plt.title(f'{title}\nRojo: Deformada (x{scale_factor:.0f}) | Azul: Original\nFactor de amplificación: {scale_factor:.1f}', 
+                 fontsize=16, fontweight='bold', pad=20)
+        
+        # Añadir información de escala
+        info_text = f'Escala de deformación: x{scale_factor:.0f}\nLas deformaciones están amplificadas para mejor visualización'
+        plt.figtext(0.02, 0.02, info_text, fontsize=11,
+                   bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.8))
+        
+        # Maximizar ventana
+        try:
+            mng = plt.get_current_fig_manager()
+            if hasattr(mng, 'window'):
+                if hasattr(mng.window, 'state'):
+                    mng.window.state('zoomed')
+                elif hasattr(mng.window, 'showMaximized'):
+                    mng.window.showMaximized()
+        except:
+            pass
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print(f"✅ {title} generada exitosamente")
+        print(f"   🎯 Factor de escala final: {scale_factor:.1f}")
+        
+        return fig, scale_factor
+        
+    except Exception as e:
+        print(f"❌ Error generando {title}: {e}")
+        return None, None
+
 def plot_model_native(num_floor, total_nodes, total_elements):
     """
     Visualización nativa del modelo sin dependencia de opsvis,
@@ -201,18 +316,55 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
                 print(f"✗ Error en visualización simple del modelo: {e2}")
                 reference_figure = None
 
-    print("\n=== VISUALIZACIÓN DE LA FORMA DEFORMADA ===\n")
+    print("\n=== VISUALIZACIÓN DE LA FORMA DEFORMADA CON ESCALA OPTIMIZADA ===\n")
     try:
+        # Calcular factor de escala automático para visualizar bien las deformaciones
+        node_tags = ops.getNodeTags()
+        max_displacement = 0.0
+        structure_dimension = 0.0
+        
+        # Obtener desplazamientos máximos y dimensiones de la estructura
+        coords = []
+        for tag in node_tags:
+            try:
+                disp = ops.nodeDisp(tag)
+                coord = ops.nodeCoord(tag)
+                coords.append(coord)
+                
+                # Calcular desplazamiento total (magnitud del vector)
+                total_disp = (disp[0]**2 + disp[1]**2 + disp[2]**2)**0.5
+                max_displacement = max(max_displacement, total_disp)
+            except:
+                continue
+        
+        if coords:
+            coords = np.array(coords)
+            x_span = coords[:, 0].max() - coords[:, 0].min()
+            y_span = coords[:, 1].max() - coords[:, 1].min()
+            z_span = coords[:, 2].max() - coords[:, 2].min()
+            structure_dimension = max(x_span, y_span, z_span)
+        
+        # Calcular factor de escala para que las deformaciones sean visibles (10-20% de la estructura)
+        if max_displacement > 0 and structure_dimension > 0:
+            optimal_scale = (structure_dimension * 0.15) / max_displacement
+        else:
+            optimal_scale = 100  # Factor por defecto
+        
+        print(f"  📊 Desplazamiento máximo: {max_displacement:.6f} m")
+        print(f"  📏 Dimensión característica: {structure_dimension:.2f} m")
+        print(f"  🎯 Factor de escala aplicado: {optimal_scale:.1f}")
+        print(f"  📐 Deformación visual máxima: {max_displacement * optimal_scale:.3f} m ({max_displacement * optimal_scale / structure_dimension * 100:.1f}% de la estructura)")
+        
         # Crear figura de forma deformada con tamaño apropiado
         plt.figure(figsize=(16, 12))
         opsv.plot_defo(
-            sfac=False,
+            sfac=optimal_scale,  # Usar factor de escala calculado
             nep=17,
             unDefoFlag=1,
-            fmt_defo={'color': 'blue', 'linestyle': 'solid', 'linewidth': 1.2, 'marker': '', 'markersize': 1},
-            fmt_undefo={'color': 'green', 'linestyle': (0, (1, 5)), 'linewidth': 1.2, 'marker': '.', 'markersize': 1},
-            fmt_defo_faces={'alpha': 0.5, 'edgecolors': 'k', 'linewidths': 1},
-            fmt_undefo_faces={'alpha': 0.5, 'edgecolors': 'g', 'facecolors': 'w', 'linestyles': 'dotted', 'linewidths': 1},
+            fmt_defo={'color': 'blue', 'linestyle': 'solid', 'linewidth': 2.0, 'marker': '', 'markersize': 1},
+            fmt_undefo={'color': 'lightgray', 'linestyle': '--', 'linewidth': 1.0, 'marker': '.', 'markersize': 1},
+            fmt_defo_faces={'alpha': 0.7, 'edgecolors': 'darkblue', 'linewidths': 1.5},
+            fmt_undefo_faces={'alpha': 0.3, 'edgecolors': 'gray', 'facecolors': 'white', 'linestyles': 'dotted', 'linewidths': 0.8},
             interpFlag=1,
             endDispFlag=0,
             fmt_nodes={'color': 'red', 'linestyle': 'None', 'linewidth': 1.2, 'marker': 's', 'markersize': 6},
@@ -223,7 +375,8 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
             node_supports=True,
             ax=False
         )
-        plt.title('Forma Deformada vs. No Deformada\nAzul: Deformada | Verde: Original', fontsize=14, fontweight='bold')
+        plt.title(f'Forma Deformada vs. No Deformada\nAzul: Deformada (Escala x{optimal_scale:.0f}) | Gris: Original\nDesplazamiento máximo real: {max_displacement:.6f} m', 
+                 fontsize=14, fontweight='bold')
         
         # Maximizar ventana de forma deformada
         try:
@@ -242,9 +395,40 @@ def plot_model_and_defo(num_floor, total_nodes, total_elements):
         print(f"✗ Error en la visualización de la forma deformada: {e}")
         print("Intentando visualización simple de la forma deformada...")
         try:
+            # Usar el mismo cálculo de escala para el respaldo
+            node_tags = ops.getNodeTags()
+            max_displacement = 0.0
+            structure_dimension = 0.0
+            
+            coords = []
+            for tag in node_tags:
+                try:
+                    disp = ops.nodeDisp(tag)
+                    coord = ops.nodeCoord(tag)
+                    coords.append(coord)
+                    total_disp = (disp[0]**2 + disp[1]**2 + disp[2]**2)**0.5
+                    max_displacement = max(max_displacement, total_disp)
+                except:
+                    continue
+            
+            if coords:
+                coords = np.array(coords)
+                x_span = coords[:, 0].max() - coords[:, 0].min()
+                y_span = coords[:, 1].max() - coords[:, 1].min()
+                z_span = coords[:, 2].max() - coords[:, 2].min()
+                structure_dimension = max(x_span, y_span, z_span)
+            
+            if max_displacement > 0 and structure_dimension > 0:
+                optimal_scale = (structure_dimension * 0.15) / max_displacement
+            else:
+                optimal_scale = 100
+            
+            print(f"  🎯 Factor de escala aplicado (simple): {optimal_scale:.1f}")
+            
             plt.figure(figsize=(16, 12))
-            opsv.plot_defo()
-            plt.title('Forma Deformada Simple', fontsize=14, fontweight='bold')
+            opsv.plot_defo(sfac=optimal_scale)
+            plt.title(f'Forma Deformada Simple (Escala x{optimal_scale:.0f})\nDesplazamiento máximo: {max_displacement:.6f} m', 
+                     fontsize=14, fontweight='bold')
             
             # Maximizar ventana simple
             try:

@@ -196,19 +196,24 @@ def get_section_input(element_type, interactive=True):
             except ValueError:
                 print("Por favor ingrese un número válido")
     else:
-        print("Tipos de sección disponibles:")
-        print("1. Rectangular")
-        print("2. Circular")
-        
-        while True:
-            try:
-                choice = int(input("Seleccione el tipo de sección (1-2): "))
-                if choice in [1, 2]:
-                    break
-                else:
-                    print("Seleccione 1 o 2")
-            except ValueError:
-                print("Por favor ingrese un número válido")
+        # Para vigas, asumir automáticamente sección rectangular
+        if element_type == "viga":
+            choice = 1  # Rectangular por defecto
+            print("Sección rectangular seleccionada automáticamente para vigas")
+        else:
+            print("Tipos de sección disponibles:")
+            print("1. Rectangular")
+            print("2. Circular")
+            
+            while True:
+                try:
+                    choice = int(input("Seleccione el tipo de sección (1-2): "))
+                    if choice in [1, 2]:
+                        break
+                    else:
+                        print("Seleccione 1 o 2")
+                except ValueError:
+                    print("Por favor ingrese un número válido")
         
         if choice == 1:  # Rectangular
             while True:
@@ -336,19 +341,24 @@ def get_section_input(element_type, interactive=True):
             except ValueError:
                 print("Por favor ingrese un número válido")
     else:
-        print("Tipos de sección disponibles:")
-        print("1. Rectangular")
-        print("2. Circular")
-        
-        while True:
-            try:
-                choice = int(input("Seleccione el tipo de sección (1-2): "))
-                if choice in [1, 2]:
-                    break
-                else:
-                    print("Seleccione 1 o 2")
-            except ValueError:
-                print("Por favor ingrese un número válido")
+        # Para vigas, asumir automáticamente sección rectangular
+        if element_type in ["viga", "viga_x", "viga_y"]:
+            choice = 1  # Rectangular por defecto
+            print("Sección rectangular seleccionada automáticamente para vigas")
+        else:
+            print("Tipos de sección disponibles:")
+            print("1. Rectangular")
+            print("2. Circular")
+            
+            while True:
+                try:
+                    choice = int(input("Seleccione el tipo de sección (1-2): "))
+                    if choice in [1, 2]:
+                        break
+                    else:
+                        print("Seleccione 1 o 2")
+                except ValueError:
+                    print("Por favor ingrese un número válido")
         
         if choice == 1:  # Rectangular
             while True:

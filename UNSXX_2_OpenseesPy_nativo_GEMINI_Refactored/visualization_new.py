@@ -689,6 +689,103 @@ def generate_all_visualizations(section_properties, element_lists=None):
         print(f"\n{i}️⃣ {title}...")
         plot_force_diagram(force_type, title)
     
+    # 4. Estructura deformada con escala optimizada
+    print(f"\n9️⃣ Estructura deformada con escala optimizada...")
+    try:
+        # Usar opsvis directamente con escala optimizada
+        import opsvis as opsv
+        
+        # Calcular escala automática optimizada
+        node_tags = ops.getNodeTags()
+        max_displacement = 0.0
+        coords = []
+        
+        for tag in node_tags:
+            try:
+                disp = ops.nodeDisp(tag)
+                coord = ops.nodeCoord(tag)
+                coords.append(coord)
+                total_disp = (disp[0]**2 + disp[1]**2 + disp[2]**2)**0.5
+                max_displacement = max(max_displacement, total_disp)
+            except:
+                continue
+        
+        if coords and max_displacement > 0:
+            coords = np.array(coords)
+            structure_dimension = max(coords.max(axis=0) - coords.min(axis=0))
+            scale_factor = (structure_dimension * 0.15) / max_displacement
+        else:
+            scale_factor = 100
+        
+        print(f"  📊 Desplazamiento máximo: {max_displacement:.6f} m")
+        print(f"  🎯 Factor de escala aplicado: {scale_factor:.1f}")
+        
+        plt.figure(figsize=(16, 12))
+        opsv.plot_defo(
+            sfac=scale_factor,
+            nep=17,
+            unDefoFlag=1,
+            fmt_defo={'color': 'red', 'linestyle': 'solid', 'linewidth': 2.0},
+            fmt_undefo={'color': 'lightgray', 'linestyle': '--', 'linewidth': 1.0},
+            az_el=(-60.0, 30.0),
+            fig_wi_he=(16, 12)
+        )
+        plt.title(f'Estructura Deformada vs Original\nRojo: Deformada (Escala x{scale_factor:.0f}) | Gris: Original\nDesplazamiento máximo: {max_displacement:.6f} m',
+                 fontsize=14, fontweight='bold')
+        
+        # Maximizar ventana
+        try:
+            mng = plt.get_current_fig_manager()
+            if hasattr(mng, 'window'):
+                if hasattr(mng.window, 'state'):
+                    mng.window.state('zoomed')
+                elif hasattr(mng.window, 'showMaximized'):
+                    mng.window.showMaximized()
+        except:
+            pass
+        
+        plt.show()
+        print(f"✅ Estructura deformada generada (escala optimizada: {scale_factor:.1f})")
+        
+    except Exception as e:
+        print(f"⚠️ Error generando estructura deformada: {e}")
+        print("   Intentando método alternativo...")
+        try:
+            # Método de respaldo
+            import opsvis as opsv
+            import matplotlib.pyplot as plt
+            
+            # Calcular escala automática
+            node_tags = ops.getNodeTags()
+            max_displacement = 0.0
+            coords = []
+            
+            for tag in node_tags:
+                try:
+                    disp = ops.nodeDisp(tag)
+                    coord = ops.nodeCoord(tag)
+                    coords.append(coord)
+                    total_disp = (disp[0]**2 + disp[1]**2 + disp[2]**2)**0.5
+                    max_displacement = max(max_displacement, total_disp)
+                except:
+                    continue
+            
+            if coords and max_displacement > 0:
+                coords = np.array(coords)
+                structure_dimension = max(coords.max(axis=0) - coords.min(axis=0))
+                scale_factor = (structure_dimension * 0.15) / max_displacement
+            else:
+                scale_factor = 100
+            
+            plt.figure(figsize=(16, 12))
+            opsv.plot_defo(sfac=scale_factor, unDefoFlag=1)
+            plt.title(f'Estructura Deformada (Escala x{scale_factor:.0f})\nDesplazamiento máximo: {max_displacement:.6f} m',
+                     fontsize=14, fontweight='bold')
+            plt.show()
+            print(f"✅ Estructura deformada generada (escala: {scale_factor:.1f})")
+        except Exception as e2:
+            print(f"❌ No se pudo generar la estructura deformada: {e2}")
+    
     print("\n✅ TODAS LAS VISUALIZACIONES COMPLETADAS")
     print("📋 La figura de referencia permanece abierta para consulta del CSV")
 

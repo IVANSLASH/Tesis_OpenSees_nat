@@ -403,18 +403,19 @@ def get_front_cantilever_config():
     print("-" * 40)
     print("El volado frontal se extiende en la dirección X positiva.")
     print("Se aplicará desde el segundo nivel hacia arriba.")
-    print("🚨 MÁXIMO RECOMENDADO: 0.8 m (para estabilidad estructural)")
-    print("💡 Recomendación óptima: 0.5-0.8 m")
+    print("🚨 MÁXIMO RECOMENDADO: 1.0 m (con vigas de borde adecuadas)")
+    print("💡 Recomendación óptima: 0.6-1.0 m")
+    print("🔧 IMPORTANTE: Las vigas se conectarán ortogonalmente en forma de 'E' a las columnas")
     print()
     
     while True:
         try:
-            length = float(input("Longitud del volado frontal (m) [0.3-0.8]: ").strip())
-            if 0.3 <= length <= 0.8:
+            length = float(input("Longitud del volado frontal (m) [0.3-1.0]: ").strip())
+            if 0.3 <= length <= 1.0:
                 break
             else:
-                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 0.8 m")
-                print("   Para volados >0.8m el análisis puede fallar por inestabilidad")
+                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 1.0 m")
+                print("   Para volados >1.0m consulte con ingeniero estructural")
         except ValueError:
             print("❌ Ingrese un valor numérico válido")
         except KeyboardInterrupt:
@@ -483,18 +484,19 @@ def get_side_cantilever_config(side):
     print(f"\n🏢 CONFIGURACIÓN DE VOLADO LATERAL {side.upper()}")
     print("-" * 50)
     print(f"El volado lateral {side} se extiende en la dirección Y.")
-    print("🚨 MÁXIMO RECOMENDADO: 0.6 m (para estabilidad estructural)")
-    print("💡 Recomendación óptima: 0.4-0.6 m")
+    print("🚨 MÁXIMO RECOMENDADO: 1.0 m (con vigas de borde adecuadas)")
+    print("💡 Recomendación óptima: 0.6-1.0 m")
+    print("🔧 IMPORTANTE: Las vigas se conectarán ortogonalmente en forma de 'E' a las columnas")
     print()
     
     while True:
         try:
-            length = float(input(f"Longitud del volado {side} (m) [0.3-0.6]: ").strip())
-            if 0.3 <= length <= 0.6:
+            length = float(input(f"Longitud del volado {side} (m) [0.3-1.0]: ").strip())
+            if 0.3 <= length <= 1.0:
                 break
             else:
-                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 0.6 m")
-                print("   Para volados >0.6m el análisis puede fallar por inestabilidad")
+                print("❌ Longitud fuera de rango. Use valores entre 0.3 y 1.0 m")
+                print("   Para volados >1.0m consulte con ingeniero estructural")
         except ValueError:
             print("❌ Ingrese un valor numérico válido")
         except KeyboardInterrupt:
