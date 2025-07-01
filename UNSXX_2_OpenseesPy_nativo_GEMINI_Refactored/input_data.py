@@ -221,6 +221,9 @@ def get_default_geometry_data():
         "bay_widths_y": [4.0, 5.0, 4.0],
         "story_heights": [3.0, 3.0, 3.0],
         "mesh_density": 2,
+        "span_x": 5.0,  # Primer vano en X
+        "span_y": 4.0,  # Primer vano en Y
+        "story_height": 3.0  # Primer piso
     }
 
 def validate_geometry_data(data):
