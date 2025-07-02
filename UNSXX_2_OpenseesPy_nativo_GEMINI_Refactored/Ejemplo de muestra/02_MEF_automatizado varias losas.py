@@ -11,6 +11,25 @@ import numpy as np                  # Librería para operaciones numéricas
 # CONFIGURACIÓN DE PARÁMETROS GEOMÉTRICOS Y MATERIALES
 # ============================================================================
 
+def obtener_input(prompt, por_defecto):
+    """
+    Función para obtener input del usuario con un valor por defecto.
+    """
+    return input(f"{prompt} (sugerencia: {por_defecto}): ") or por_defecto
+
+def calcular_propiedades_seccion(ancho, altura):
+    """
+    Calcula las propiedades de una sección rectangular.
+    """
+    A = ancho * altura
+    Iy = (ancho * altura**3) / 12
+    Iz = (altura * ancho**3) / 12
+    # Aproximación de la inercia torsional para sección rectangular
+    a = max(ancho, altura)
+    b = min(ancho, altura)
+    J = a * (b**3) * (1/3 - 0.21 * (b/a) * (1 - (b**4)/(12*a**4)))
+    return {'A': A, 'J': J, 'Iy': Iy, 'Iz': Iz}
+
 def obtener_configuracion_usuario():
     """
     Función para obtener la configuración del usuario
@@ -18,17 +37,26 @@ def obtener_configuracion_usuario():
     print("=" * 60)
     print("    SISTEMA AUTOMATIZADO DE MÚLTIPLES LOSAS")
     print("=" * 60)
-    # Valores predeterminados sugeridos
-    num_vanos_x = 2
-    num_vanos_y = 2
-    largo_vano_x = 4.0
-    largo_vano_y = 4.0
-    divisiones_por_vano = 10
-    altura_losa = 4.0
-    espesor_losa = 0.4
-    E = 1000.0
-    nu = 0.3
-    print(f"Usando valores predeterminados:\n  Vanos X: {num_vanos_x}, Vanos Y: {num_vanos_y}, Lx: {largo_vano_x}, Ly: {largo_vano_y}, Divisiones: {divisiones_por_vano}, Altura: {altura_losa}, Espesor: {espesor_losa}, E: {E}, nu: {nu}")
+    
+    print("--- Configuración General ---")
+    num_vanos_x = int(obtener_input("Número de vanos en X", 2))
+    num_vanos_y = int(obtener_input("Número de vanos en Y", 2))
+    largo_vano_x = float(obtener_input("Largo del vano en X (m)", 4.0))
+    largo_vano_y = float(obtener_input("Largo del vano en Y (m)", 4.0))
+    divisiones_por_vano = int(obtener_input("Divisiones por vano", 10))
+    altura_losa = float(obtener_input("Altura de la losa (m)", 4.0))
+    espesor_losa = float(obtener_input("Espesor de la losa (m)", 0.20))
+    E = float(obtener_input("Módulo de Young (E) (kN/m2)", 21000000.0))
+    nu = float(obtener_input("Coeficiente de Poisson (nu)", 0.3))
+
+    print("\n--- Propiedades de las Columnas (m) ---")
+    col_ancho_x = float(obtener_input("Ancho en X", 0.4))
+    col_ancho_y = float(obtener_input("Ancho en Y", 0.4))
+
+    print("\n--- Propiedades de las Vigas (m) ---")
+    viga_ancho = float(obtener_input("Ancho", 0.3))
+    viga_altura = float(obtener_input("Altura", 0.5))
+
     return {
         'num_vanos_x': num_vanos_x,
         'num_vanos_y': num_vanos_y,
@@ -38,7 +66,11 @@ def obtener_configuracion_usuario():
         'altura_losa': altura_losa,
         'espesor_losa': espesor_losa,
         'E': E,
-        'nu': nu
+        'nu': nu,
+        'col_ancho_x': col_ancho_x,
+        'col_ancho_y': col_ancho_y,
+        'viga_ancho': viga_ancho,
+        'viga_altura': viga_altura,
     }
 
 # ============================================================================
@@ -176,11 +208,9 @@ def crear_columnas_apoyo(nodos_apoyo, esquinas_losa, config):
     nu = config['nu']
     G = E / (2 * (1 + nu))
     
-    # Propiedades de sección para columnas
-    A = 100
-    J = 1000
-    Iy = 1000
-    Iz = 1000
+    # Calcular propiedades de la sección de la columna
+    prop_col = calcular_propiedades_seccion(config['col_ancho_x'], config['col_ancho_y'])
+    A, J, Iy, Iz = prop_col['A'], prop_col['J'], prop_col['Iy'], prop_col['Iz']
     
     # Crear material y transformación
     ops.uniaxialMaterial('Elastic', 2, E)
@@ -203,82 +233,90 @@ def crear_columnas_apoyo(nodos_apoyo, esquinas_losa, config):
 # FUNCIÓN PARA CREAR VIGAS EN DIRECCIÓN X
 # ============================================================================
 
-def crear_vigas_direccion_x(config, esquinas_losa):
+def crear_vigas_direccion_x(config, num_nodos_x, num_nodos_y):
     """
-    Función para crear vigas en dirección X conectando columnas
+    Función para crear vigas en dirección X conectando todos los nodos de la losa a lo largo del eje de la viga.
     """
     nx = config['num_vanos_x']
     ny = config['num_vanos_y']
+    n_div = config['divisiones_por_vano']
     E = config['E']
     nu = config['nu']
     G = E / (2 * (1 + nu))
-    A = 80
-    J = 800
-    Iy = 800
-    Iz = 800
+    
+    # Calcular propiedades de la sección de la viga
+    prop_viga = calcular_propiedades_seccion(config['viga_ancho'], config['viga_altura'])
+    A, J, Iy, Iz = prop_viga['A'], prop_viga['J'], prop_viga['Iy'], prop_viga['Iz']
+
     ops.uniaxialMaterial('Elastic', 3, E)
     ops.geomTransf('Linear', 2, *[0, 0, 1])
+    
     ele_tag_viga = 2000
     num_vigas_x = 0
     
-    # Crear vigas en dirección X entre columnas
-    for fila in range(ny + 1):  # Para cada fila de columnas
-        for col in range(nx):    # Para cada vano en X
-            # Calcular índices de columnas conectadas
-            idx_col1 = fila * (nx + 1) + col
-            idx_col2 = fila * (nx + 1) + col + 1
+    # Iterar a lo largo de las líneas de vigas en Y
+    for j_linea in range(ny + 1):
+        pos_y = j_linea * n_div
+        # Iterar a lo largo de los nodos en X para crear segmentos de viga
+        for i_nodo in range(num_nodos_x - 1):
+            # Nodos que forman el segmento de viga
+            nodo1 = i_nodo * num_nodos_y + pos_y + 1
+            nodo2 = (i_nodo + 1) * num_nodos_y + pos_y + 1
             
-            # Crear viga conectando las dos columnas
             ops.element(
                 'elasticBeamColumn',
                 ele_tag_viga + num_vigas_x,
-                esquinas_losa[idx_col1], esquinas_losa[idx_col2],
+                nodo1, nodo2,
                 A, E, G, J, Iy, Iz, 2
             )
             num_vigas_x += 1
-    
-    print(f"   Vigas en dirección X creadas: {num_vigas_x}")
+            
+    print(f"   Vigas (segmentos) en dirección X creadas: {num_vigas_x}")
     return num_vigas_x
 
 # ============================================================================
 # FUNCIÓN PARA CREAR VIGAS EN DIRECCIÓN Y
 # ============================================================================
 
-def crear_vigas_direccion_y(config, esquinas_losa):
+def crear_vigas_direccion_y(config, num_nodos_x, num_nodos_y):
     """
-    Función para crear vigas en dirección Y conectando columnas
+    Función para crear vigas en dirección Y conectando todos los nodos de la losa a lo largo del eje de la viga.
     """
     nx = config['num_vanos_x']
     ny = config['num_vanos_y']
+    n_div = config['divisiones_por_vano']
     E = config['E']
     nu = config['nu']
     G = E / (2 * (1 + nu))
-    A = 80
-    J = 800
-    Iy = 800
-    Iz = 800
+    
+    # Calcular propiedades de la sección de la viga
+    prop_viga = calcular_propiedades_seccion(config['viga_ancho'], config['viga_altura'])
+    A, J, Iy, Iz = prop_viga['A'], prop_viga['J'], prop_viga['Iy'], prop_viga['Iz']
+
     ops.uniaxialMaterial('Elastic', 4, E)
     ops.geomTransf('Linear', 3, *[0, 0, 1])
+    
     ele_tag_viga = 3000
     num_vigas_y = 0
     
-    # Crear vigas en dirección Y entre columnas
-    for col in range(nx + 1):  # Para cada columna de columnas
-        for fila in range(ny):  # Para cada vano en Y
-            # Calcular índices de columnas conectadas
-            idx_col1 = fila * (nx + 1) + col
-            idx_col2 = (fila + 1) * (nx + 1) + col
+    # Iterar a lo largo de las líneas de vigas en X
+    for i_linea in range(nx + 1):
+        pos_x = i_linea * n_div
+        # Iterar a lo largo de los nodos en Y para crear segmentos de viga
+        for j_nodo in range(num_nodos_y - 1):
+            # Nodos que forman el segmento de viga
+            nodo1 = (pos_x * num_nodos_y) + j_nodo + 1
+            nodo2 = nodo1 + 1
             
-            # Crear viga conectando las dos columnas
             ops.element(
                 'elasticBeamColumn',
                 ele_tag_viga + num_vigas_y,
-                esquinas_losa[idx_col1], esquinas_losa[idx_col2],
+                nodo1, nodo2,
                 A, E, G, J, Iy, Iz, 3
             )
             num_vigas_y += 1
-    
-    print(f"   Vigas en dirección Y creadas: {num_vigas_y}")
+            
+    print(f"   Vigas (segmentos) en dirección Y creadas: {num_vigas_y}")
     return num_vigas_y
 
 # ============================================================================
@@ -294,7 +332,7 @@ def aplicar_cargas_distribuidas(num_nodos_x, num_nodos_y, config):
     ops.pattern('Plain', 1, 1)
     
     # Carga distribuida por nodo (kN)
-    carga_por_nodo = float(input("\n💪 Carga distribuida por nodo (kN): ") or "1.0")
+    carga_por_nodo = float(obtener_input("\n💪 Carga distribuida por nodo (kN)", "1.0"))
     
     # Aplicar carga a todos los nodos de la losa
     for i in range(1, num_nodos_x * num_nodos_y + 1):
@@ -403,6 +441,23 @@ def generar_visualizaciones():
     plt.title('Sistema de Múltiples Losas - Deformación', fontsize=14)
     plt.show()
 
+def visualizar_diagramas_de_momentos():
+    """
+    Función para visualizar los diagramas de momentos flectores.
+    """
+    print("\n📊 GENERANDO DIAGRAMAS DE MOMENTOS...")
+    
+    # Diagrama de Momento 3-3 (Momento alrededor del eje local 3)
+    opsv.plot_beam_diagram('M', 3, sfac=100.0)
+    plt.title("Diagrama de Momento Flector (M3)")
+    plt.show()
+
+    # Diagrama de Momento 2-2 (Momento alrededor del eje local 2)
+    opsv.plot_beam_diagram('M', 2, sfac=100.0)
+    plt.title("Diagrama de Momento Flector (M2)")
+    plt.show()
+
+
 # ============================================================================
 # FUNCIÓN PRINCIPAL
 # ============================================================================
@@ -430,10 +485,10 @@ def main():
         num_columnas = crear_columnas_apoyo(nodos_apoyo, esquinas_losa, config)
         
         # 6. Crear vigas en dirección X
-        num_vigas_x = crear_vigas_direccion_x(config, esquinas_losa)
+        num_vigas_x = crear_vigas_direccion_x(config, num_nodos_x, num_nodos_y)
         
         # 7. Crear vigas en dirección Y
-        num_vigas_y = crear_vigas_direccion_y(config, esquinas_losa)
+        num_vigas_y = crear_vigas_direccion_y(config, num_nodos_x, num_nodos_y)
         
         # 8. Aplicar cargas
         carga_aplicada = aplicar_cargas_distribuidas(num_nodos_x, num_nodos_y, config)
@@ -444,7 +499,10 @@ def main():
         # 10. Generar visualizaciones
         generar_visualizaciones()
         
-        # 11. Resumen final
+        # 11. Visualizar diagramas de momentos
+        visualizar_diagramas_de_momentos()
+
+        # 12. Resumen final
         print("\n" + "=" * 60)
         print("🎉 ANÁLISIS COMPLETADO EXITOSAMENTE")
         print("=" * 60)
