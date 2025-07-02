@@ -1,4 +1,6 @@
-<# Importación de librerías necesarias para el análisis estructural
+# Importación de librerías necesarias para el análisis estructural
+# pip install openseespy opsvis matplotlib
+
 import openseespy.opensees as ops  # Librería principal de OpenSees para análisis estructural
 import opsvis as opsv              # Librería para visualización de modelos OpenSees
 import matplotlib.pyplot as plt     # Librería para gráficos y visualización

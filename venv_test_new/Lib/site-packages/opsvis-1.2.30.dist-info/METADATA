@@ -1,0 +1,40 @@
+Metadata-Version: 2.4
+Name: opsvis
+Version: 1.2.30
+Summary: OpenSeesPy (OpenSees) Python postprocessing and visualization module
+Home-page: https://github.com/sewkokot/opsvis
+Author: Seweryn Kokot
+Author-email: sewkokot@gmail.com
+Project-URL: Bug Tracker, https://github.com/sewkokot/opsvis/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: openseespy
+Dynamic: license-file
+
+# opsvis
+
+OpenSeesPy (OpenSees) postprocessing and visualization module
+
+## Installation
+
+`pip install opsvis`
+
+Note: The previous name of this module was `ops_vis`, but to avoid
+issues with PyPi and readthedocs naming conventions, the name of the
+package and module to import is without the underscore.
+
+## Usage
+
+`import opsvis as opsv`
+
+## Documentation
+
+https://opsvis.readthedocs.io/en/latest/
+
+## OpenSeesPy documentation
+
+https://openseespydoc.readthedocs.io/en/latest/

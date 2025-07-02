@@ -1,4 +1,3 @@
-
 # main.py
 # ============================================
 # Este script principal orquesta el modelado, análisis y visualización
@@ -16,6 +15,7 @@
 # 7. Visualización avanzada y didáctica
 # 8. Generación de reportes completos
 # ============================================
+# pip install openseespy numpy pandas matplotlib
 
 import openseespy.opensees as ops
 import sys
